@@ -1,5 +1,56 @@
+# === 密钥与环境变量（最高优先级）===
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets/
 
+# === 索引数据库（含代码符号信息，间接暴露代码结构）===
+# 整个索引目录，含 sqlite 主库 + WAL/SHM 副产物
+.code_archmage_index/
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db
+index_cache/
+
+# === AI 协作数据（含记忆、对话历史，可能含私有代码片段）===
 .codebuddy/
 
+# === 测试用的真实代码仓库（如有，绝不提交）===
+test_repos/private/
+*.private.py
 
-plans/
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# === Node ===
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+
+# === 系统/IDE ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === 日志 ===
+*.log
+logs/
