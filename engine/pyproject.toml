@@ -52,6 +52,7 @@ asyncio_mode = "auto"
 target-version = "py311"
 line-length = 100
 src = ["src", "tests"]
+exclude = ["tests/fixtures"]  # fixtures 是测试用的代码片段，不 lint
 
 [tool.ruff.lint]
 select = [
