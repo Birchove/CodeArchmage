@@ -54,12 +54,27 @@ def _delete_file_data(conn: sqlite3.Connection, file_path: str) -> None:
 
 
 def _iter_python_files(repo_root: str | Path) -> list[Path]:
-    """遍历仓库下所有 .py 文件，跳过 __pycache__ / .venv / venv 等。"""
+    """遍历仓库下所有 .py 文件，跳过 __pycache__ / .venv / venv 等。
+
+    过滤符号链接（cc S-1 修复）：rglob 会收集 symlink .py 文件，
+    可能将仓库外代码的符号/签名/导入吸进索引库，对隐私产品是实质泄漏。
+    MVP 一律不跟随 symlink（最简单最安全）。
+
+    跳过目录检查用相对路径分片（cc B-4 修复）：原来用绝对路径全分片，
+    若仓库本身位于名为 venv/node_modules 的目录下会误杀整个仓库。
+    """
     root = Path(repo_root)
     results: list[Path] = []
     for path in root.rglob("*.py"):
-        # 检查路径中是否包含需跳过的目录
-        if any(part in _SKIP_DIRS for part in path.parts):
+        # 跳过符号链接（防止仓库外代码泄漏进索引库）
+        if path.is_symlink():
+            continue
+        # 检查仓库内相对路径是否含需跳过的目录（cc B-4：用相对路径，非绝对路径）
+        try:
+            rel_parts = path.relative_to(root).parts
+        except ValueError:
+            continue
+        if any(part in _SKIP_DIRS for part in rel_parts):
             continue
         results.append(path)
     return results

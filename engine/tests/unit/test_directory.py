@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from code_archmage.indexer.resolver import assign_callers, resolve_callees
 from code_archmage.indexer.schema import init_db
 from code_archmage.indexer.writer import index_directory
@@ -178,3 +180,54 @@ class TestDirectoryEdgeCases:
         conn.close()
 
         assert good is not None
+
+
+class TestSymlinkNotIndexed:
+    """循环 3：符号链接逃逸（索引侧）—— cc S-1 修复。
+
+    rglob("*.py") 会收集 symlink .py 文件，把仓库外代码吸进索引库。
+    _iter_python_files 必须过滤 is_symlink() 条目。
+    """
+
+    def test_symlink_py_not_indexed(
+        self, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """仓库内 symlink .py 指向仓库外 → 不被索引。"""
+        # 仓库外放一个"机密"文件
+        outside = tmp_path_factory.mktemp("outside")
+        (outside / "secret.py").write_bytes(b"def leak_secret():\n    return 'COMPANY_CODE'\n")
+
+        # 仓库内放一个正常文件 + 一个指向外部的 symlink
+        (tmp_path / "safe.py").write_bytes(b"def safe_func():\n    pass\n")
+        (tmp_path / "leak.py").symlink_to(outside / "secret.py")
+
+        conn = init_db(":memory:")
+        index_directory(conn, tmp_path)
+
+        files = conn.execute("SELECT path FROM files ORDER BY path").fetchall()
+        symbols = conn.execute("SELECT name FROM symbols").fetchall()
+        conn.close()
+
+        # leak.py（symlink）不应被索引
+        assert ("leak.py",) not in files
+        assert ("safe.py",) in files
+        # leak_secret 不应进入符号表
+        assert ("leak_secret",) not in symbols
+        assert ("safe_func",) in symbols
+
+    def test_iter_python_files_skips_symlinks(
+        self, tmp_path: Path, tmp_path_factory: pytest.TempPathFactory
+    ) -> None:
+        """_iter_python_files 直接过滤 symlink。"""
+        from code_archmage.indexer.writer import _iter_python_files
+
+        outside = tmp_path_factory.mktemp("outside2")
+        (outside / "ext.py").write_bytes(b"x = 1\n")
+        (tmp_path / "real.py").write_bytes(b"y = 2\n")
+        (tmp_path / "link.py").symlink_to(outside / "ext.py")
+
+        result = _iter_python_files(tmp_path)
+        names = {p.name for p in result}
+
+        assert "real.py" in names
+        assert "link.py" not in names
