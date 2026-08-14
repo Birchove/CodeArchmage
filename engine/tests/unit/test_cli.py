@@ -26,7 +26,9 @@ class TestCLI:
         captured = capsys.readouterr()
         assert "不存在" in captured.err
 
-    def test_file_not_dir_returns_1(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_file_not_dir_returns_1(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """路径指向文件而非目录 → 返回 1。"""
         file_path = tmp_path / "not_a_dir.txt"
         file_path.write_text("x")

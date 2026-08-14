@@ -174,9 +174,7 @@ def _query_file_calls(conn: sqlite3.Connection, rel_path: str) -> list[CallOut]:
         "WHERE file_path = ? ORDER BY line, col",
         (rel_path,),
     ).fetchall()
-    return [
-        CallOut(callee_name=r[0], callee_id=r[1], line=r[2], col=r[3]) for r in rows
-    ]
+    return [CallOut(callee_name=r[0], callee_id=r[1], line=r[2], col=r[3]) for r in rows]
 
 
 @router.get("/api/files/{file_path:path}", response_model=FileContentOut)

@@ -22,9 +22,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Code Archmage — 只读源码拆解浏览器。启动 localhost 服务。",
     )
     parser.add_argument("repo_path", type=Path, help="要索引的仓库根目录")
-    parser.add_argument(
-        "--port", type=int, default=8765, help="服务端口（默认 8765）"
-    )
+    parser.add_argument("--port", type=int, default=8765, help="服务端口（默认 8765）")
 
     args = parser.parse_args(argv)
 
