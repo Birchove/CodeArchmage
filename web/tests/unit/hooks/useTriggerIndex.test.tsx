@@ -42,11 +42,11 @@ describe("useTriggerIndex — S-4 状态机", () => {
     expect(result.current.data?.files_total).toBe(3);
   });
 
-  it("成功后 invalidate fileTree + indexStatus（S-4）", async () => {
+  it("成功后 clear 全部缓存（cc S-3：符号 id 跨 reindex 不稳定）", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    const clearSpy = vi.spyOn(queryClient, "clear");
 
     server.use(
       http.post("*/api/index", () =>
@@ -65,10 +65,8 @@ describe("useTriggerIndex — S-4 状态机", () => {
     result.current.mutate();
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // 验证 fileTree 和 indexStatus 都被 invalidate
-    const invalidatedKeys = invalidateSpy.mock.calls.map((c) => c[0].queryKey);
-    expect(invalidatedKeys).toContainEqual(["fileTree"]);
-    expect(invalidatedKeys).toContainEqual(["indexStatus"]);
+    // cc S-3：clear() 清空全部缓存
+    expect(clearSpy).toHaveBeenCalled();
   });
 
   it("409（索引互斥）→ isError", async () => {

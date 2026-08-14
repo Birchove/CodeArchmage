@@ -1,4 +1,9 @@
-/** POST /api/index（mutation，含 pending/409/invalidate，S-4） */
+/**
+ * POST /api/index（mutation，含 pending/409/invalidate）。
+ *
+ * cc S-3：reindex 后符号 id 不稳定（SQLite rowid 重排），
+ * 用 queryClient.clear() 清空全部缓存（含 fileContent、callers、callees、search）。
+ */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { triggerIndex } from "@/api/endpoints";
 
@@ -7,9 +12,8 @@ export function useTriggerIndex() {
   return useMutation({
     mutationFn: triggerIndex,
     onSuccess: () => {
-      // 索引成功后同时刷新文件树 + 索引状态（S-4）
-      void queryClient.invalidateQueries({ queryKey: ["fileTree"] });
-      void queryClient.invalidateQueries({ queryKey: ["indexStatus"] });
+      // cc S-3：清空全部缓存（符号 id 跨 reindex 不稳定）
+      queryClient.clear();
     },
   });
 }

@@ -8,6 +8,7 @@ import type {
   FileTreeOut,
   IndexResultOut,
   IndexStatusOut,
+  SearchHitOut,
   SymbolOut,
 } from "./types";
 
@@ -29,3 +30,20 @@ export const getSymbolById = (id: number): Promise<SymbolOut> =>
 
 export const getSymbolsByName = (name: string): Promise<SymbolOut[]> =>
   apiGet<SymbolOut[]>(`/symbols?name=${encodeURIComponent(name)}`);
+
+/** FTS5 全文搜索（整词匹配）。limit 显式传 20（后端默认 200，cc B-1）。 */
+export const searchSymbols = (
+  query: string,
+  limit = 20,
+): Promise<SearchHitOut[]> =>
+  apiGet<SearchHitOut[]>(
+    `/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+
+/** 查询符号的直接调用者（按名匹配，cc S-2）。 */
+export const getCallers = (symbolId: number): Promise<SymbolOut[]> =>
+  apiGet<SymbolOut[]>(`/symbols/${symbolId}/callers`);
+
+/** 查询符号的直接被调用者（含多候选，cc S-2）。 */
+export const getCallees = (symbolId: number): Promise<SymbolOut[]> =>
+  apiGet<SymbolOut[]>(`/symbols/${symbolId}/callees`);

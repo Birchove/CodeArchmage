@@ -109,7 +109,7 @@ body {
 
 .app-body {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 280px 1fr 320px;
   overflow: hidden;
 }
 
@@ -277,4 +277,292 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* === 搜索栏（阶段 5） === */
+.search-bar {
+  position: relative;
+  flex: 0 1 240px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
+}
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+.search-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.search-loading {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  padding: 8px;
+  z-index: 100;
+}
+
+.search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.search-result-item:hover,
+.search-result-active {
+  background: var(--accent-bg);
+}
+
+.search-result-kind {
+  font-size: 11px;
+  color: var(--accent);
+  text-transform: uppercase;
+  min-width: 50px;
+}
+
+.search-result-name {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+.search-result-file {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* === 右侧面板（阶段 5） === */
+.app-aside {
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* cc B-2：折叠时保持挂载 + visibility:hidden + width:0 */
+.app-aside.aside-collapsed {
+  width: 0;
+  border-left: none;
+  visibility: hidden;
+}
+
+.sidepanel-header {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidepanel-tabs {
+  display: flex;
+  flex: 1;
+}
+
+.sidepanel-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.sidepanel-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.aside-toggle {
+  padding: 0 8px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.aside-toggle:hover {
+  color: var(--accent);
+}
+
+.sidepanel-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* cc B-2：面板保持挂载，用 visibility 控制显示（非 display:none） */
+.sidepanel-pane {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  visibility: hidden;
+}
+.sidepanel-pane.active {
+  visibility: visible;
+}
+
+.sidepanel-empty,
+.sidepanel-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+/* === 调用图（阶段 5） === */
+.callgraph-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.callgraph-container .react-flow {
+  flex: 1;
+}
+
+.callgraph-node-center {
+  border-color: var(--accent);
+  border-width: 2px;
+  background: var(--accent-bg);
+}
+
+.callgraph-hint {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+}
+
+.callgraph-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* === 剥洋葱（阶段 5） === */
+.onion-view {
+  padding: 8px;
+}
+
+.onion-path {
+  margin-bottom: 16px;
+}
+
+.onion-path-title {
+  font-size: 12px;
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+
+.onion-chain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.onion-node {
+  padding: 4px 0 4px 16px;
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+  position: relative;
+}
+.onion-node::before {
+  content: "↓";
+  position: absolute;
+  left: -8px;
+  top: 4px;
+  color: var(--text);
+  font-size: 10px;
+}
+.onion-node:first-child::before {
+  content: "";
+}
+
+.onion-node-btn {
+  border: none;
+  background: none;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+.onion-node-btn:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.onion-current .onion-node-btn {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.onion-node-file {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.onion-truncated,
+.onion-hint {
+  font-size: 11px;
+  color: var(--text);
+  padding: 4px 0;
+  margin: 0 0 8px;
+}
+
+.onion-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text);
+  font-size: 13px;
 }
