@@ -23,6 +23,15 @@ class SymbolOut(BaseModel):
     decorators: list[str]
 
 
+class CallOut(BaseModel):
+    """调用点（S-1：让前端能取到调用位置 + resolver 填的 callee_id）。"""
+
+    callee_name: str
+    callee_id: int | None
+    line: int
+    col: int
+
+
 class ReferenceOut(BaseModel):
     """引用位置（调用点 / 导入点等）。"""
 
@@ -44,12 +53,13 @@ class SearchHitOut(BaseModel):
 
 
 class FileContentOut(BaseModel):
-    """文件内容 + 符号大纲。"""
+    """文件内容 + 符号大纲 + 调用点。"""
 
     path: str
     content: str
     language: str
     symbols: list[SymbolOut]
+    calls: list[CallOut]
 
 
 class FileTreeOut(BaseModel):

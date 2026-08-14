@@ -1,0 +1,13 @@
+# 构建产物
+dist/
+test-results/
+playwright-report/
+
+# 锁文件
+pnpm-lock.yaml
+
+# 索引产物
+**/.code_archmage_index/
+
+# 运行时状态
+.last-run.json

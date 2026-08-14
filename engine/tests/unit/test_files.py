@@ -63,6 +63,37 @@ class TestFileContent:
         assert len(data["symbols"]) == 1
         assert data["symbols"][0]["name"] == "foo"
 
+    def test_file_content_with_calls(self, tmp_path: Path) -> None:
+        """S-1：文件内容含调用点（calls），让前端能跳定义。"""
+        (tmp_path / "a.py").write_bytes(b"def foo():\n    pass\n\ndef bar():\n    foo()\n")
+        app = create_app(tmp_path)
+        client = TestClient(app)
+        client.post("/api/index")
+
+        resp = client.get("/api/files/a.py")
+        assert resp.status_code == 200
+        data = resp.json()
+        # calls 字段存在
+        assert "calls" in data
+        # bar() 调用 foo() → 1 个调用点
+        assert len(data["calls"]) == 1
+        call = data["calls"][0]
+        assert call["callee_name"] == "foo"
+        assert call["line"] == 5  # foo() 在第 5 行（第 3 行是空行）
+        # callee_id 被 resolver 解析（foo 全库唯一同名）
+        assert call["callee_id"] is not None
+
+    def test_file_content_calls_empty(self, tmp_path: Path) -> None:
+        """S-1：无调用的文件 → calls 为空列表。"""
+        (tmp_path / "a.py").write_bytes(b"x = 1\n")
+        app = create_app(tmp_path)
+        client = TestClient(app)
+        client.post("/api/index")
+
+        resp = client.get("/api/files/a.py")
+        assert resp.status_code == 200
+        assert resp.json()["calls"] == []
+
     def test_file_not_found(self, tmp_path: Path) -> None:
         """不存在的文件 → 404。"""
         app = create_app(tmp_path)

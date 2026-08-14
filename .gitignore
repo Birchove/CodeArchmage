@@ -43,6 +43,11 @@ build/
 .vite/
 coverage/
 
+# === Playwright ===
+test-results/
+playwright-report/
+.last-run.json
+
 # === 系统/IDE ===
 .DS_Store
 Thumbs.db

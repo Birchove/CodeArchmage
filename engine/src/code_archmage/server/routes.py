@@ -20,6 +20,7 @@ from code_archmage.indexer.queries import find_references
 from code_archmage.indexer.resolver import assign_callers, resolve_callees
 from code_archmage.indexer.writer import index_directory
 from code_archmage.server.models import (
+    CallOut,
     FileContentOut,
     FileTreeOut,
     IndexResultOut,
@@ -166,6 +167,18 @@ def _query_file_symbols(conn: sqlite3.Connection, rel_path: str) -> list[SymbolO
     return [_row_to_symbol(r) for r in rows]
 
 
+def _query_file_calls(conn: sqlite3.Connection, rel_path: str) -> list[CallOut]:
+    """查询指定文件的调用点（S-1，按行+列排序）。"""
+    rows = conn.execute(
+        "SELECT callee_name, callee_id, line, col FROM calls "
+        "WHERE file_path = ? ORDER BY line, col",
+        (rel_path,),
+    ).fetchall()
+    return [
+        CallOut(callee_name=r[0], callee_id=r[1], line=r[2], col=r[3]) for r in rows
+    ]
+
+
 @router.get("/api/files/{file_path:path}", response_model=FileContentOut)
 async def file_content(file_path: str, request: Request) -> FileContentOut:
     """文件内容 + 符号大纲。
@@ -191,15 +204,17 @@ async def file_content(file_path: str, request: Request) -> FileContentOut:
     # 读内容（cc S-1：errors="replace" 避免非 UTF-8 文件裸 500）
     content = abs_path.read_text(encoding="utf-8", errors="replace")
 
-    # 规范化为索引时的 POSIX 相对路径，再查符号
+    # 规范化为索引时的 POSIX 相对路径，再查符号 + 调用点
     rel = abs_path.relative_to(repo_root.resolve()).as_posix()
     symbols = await _run_in_thread(db_path, _query_file_symbols, rel)
+    calls = await _run_in_thread(db_path, _query_file_calls, rel)
 
     return FileContentOut(
         path=rel,
         content=content,
         language="python",
         symbols=symbols,
+        calls=calls,
     )
 
 
