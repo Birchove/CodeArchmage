@@ -14,6 +14,21 @@
   --heading: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
+  /* CodeMirror 语法高亮（浅色） */
+  --cm-keyword: #7c3aed;
+  --cm-comment: #6b7280;
+  --cm-string: #0f766e;
+  --cm-number: #c2410c;
+  --cm-function: #1d4ed8;
+  --cm-class: #a21caf;
+  --cm-operator: #4b5563;
+  --cm-variable: #08060d;
+  --cm-decorator: #be185d;
+  --cm-type: #0369a1;
+  --cm-invalid: #dc2626;
+  --cm-active-line: rgba(170, 59, 255, 0.08);
+  --cm-jumped-line: rgba(170, 59, 255, 0.2);
+
   font: 15px/145% var(--sans);
   color-scheme: light dark;
   color: var(--text);
@@ -36,6 +51,20 @@
     --accent-border: rgba(192, 132, 252, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    --cm-keyword: #c084fc;
+    --cm-comment: #9ca3af;
+    --cm-string: #5eead4;
+    --cm-number: #fdba74;
+    --cm-function: #93c5fd;
+    --cm-class: #f0abfc;
+    --cm-operator: #9ca3af;
+    --cm-variable: #e5e7eb;
+    --cm-decorator: #f9a8d4;
+    --cm-type: #7dd3fc;
+    --cm-invalid: #f87171;
+    --cm-active-line: rgba(192, 132, 252, 0.12);
+    --cm-jumped-line: rgba(192, 132, 252, 0.28);
   }
 }
 
@@ -213,6 +242,7 @@ body {
 .code-view {
   height: 100%;
   overflow: auto;
+  background: var(--code-bg);
 }
 
 .code-view .cm-editor {

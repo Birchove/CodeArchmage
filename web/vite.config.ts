@@ -14,6 +14,14 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+    // CodeMirror 扩展依赖 instanceof；多份 @codemirror/state 会让高亮扩展无法识别
+    dedupe: [
+      "@codemirror/state",
+      "@codemirror/view",
+      "@codemirror/language",
+      "@lezer/common",
+      "@lezer/highlight",
+    ],
   },
   server: {
     proxy: {

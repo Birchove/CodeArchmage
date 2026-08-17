@@ -1,84 +1,83 @@
 # Code Archmage
 
-> 只读源码拆解浏览器 — 帮助初出茅庐的大学生理解大型工程化代码。
+本地、只读的源码拆解工具。面向「刷过题、第一次面对工程代码不知道从哪读」的计算机系学生。
 
-## 这是什么
+代码不出本机：解析和索引都在你电脑上完成，服务只监听 `127.0.0.1`。不编辑、不运行、不调试，只用来读。
 
-Code Archmage 是一个**本地优先**的只读代码阅读工具，面向"懂算法题但没读过真实工程"的计算机系学生。它帮你拆解几万行、重封装的源码：
+当前仅支持 **Python**。
 
-- **符号导航**：跳定义、查引用、查调用者（类 Source Insight）
-- **调用图**：可视化函数间的调用关系
-- **LLM 问答**：选中代码即可提问，自动注入符号上下文
-- **只读**：不编辑、不运行、不调试 — 专心"读"代码
+## 能做什么
 
-## 快速开始
+打开一个本地 Python 仓库后，可以：
 
-### 前置要求
+- 浏览文件树和当前文件的符号大纲
+- 在只读代码视图里点调用，跳到定义
+- 按符号名搜索整个项目
+- 看当前符号的一层调用图（谁调用了它、它调用了谁）
+- 「剥洋葱」：把调用链展平成从入口到当前符号的路径
+- 选中符号后向 LLM 提问；引擎会自动拼上函数体、调用关系等上下文
+- 按需生成一句话摘要（首次生成后缓存到本地索引库）
 
-- Python 3.11+
-- Node.js 22+
-- [uv](https://docs.astral.sh/uv/)（Python 包管理）
-- [pnpm](https://pnpm.io)（前端包管理）
+调用关系按函数名匹配，同名函数可能对不上，界面会标明这一点。
 
-### 引擎（后端）
+## 启动
 
-```bash
-cd engine
-uv sync --extra dev       # 安装依赖
-uv run pytest             # 跑测试
-```
+需要：Python 3.11+、Node.js 22+、[uv](https://docs.astral.sh/uv/)、[pnpm](https://pnpm.io)。
 
-### 前端
+### 1. 安装依赖（只需一次）
 
 ```bash
-cd web
-pnpm install              # 安装依赖
-pnpm test                 # 跑测试
-pnpm dev                  # 开发服务器
+cd engine && uv sync
+cd ../web && pnpm install
 ```
 
-### Git 钩子
+### 2. （可选）配置 LLM
+
+对话和摘要需要 API Key。复制根目录的 `.env.example` 为 `.env` 后填写：
+
+```env
+LLM_API_KEY=your-api-key-here
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+```
+
+任何 OpenAI 兼容接口都可以（DeepSeek、智谱、通义、OpenAI、本地 Ollama 等）。不配也能用浏览、跳转、搜索和调用图，只是右侧「对话」和摘要不可用。
+
+引擎会依次读取：**被阅读项目根目录的 `.env`**，以及 **启动命令所在目录的 `.env`**。把 `.env` 放在本仓库根目录时，请从本仓库根目录启动引擎。
+
+### 3. 起两个进程
+
+终端一，启动引擎（把路径换成你要读的 Python 项目）：
 
 ```bash
-pre-commit install        # 安装提交前检查钩子
+cd /path/to/code_archmage
+uv run --directory engine python -m code_archmage /path/to/your/python/project
 ```
 
-## 项目结构
+默认端口 `8765`，可加 `--port 8765` 修改。
+
+终端二，启动界面：
+
+```bash
+cd /path/to/code_archmage/web
+pnpm dev
+```
+
+浏览器打开 [http://localhost:5173](http://localhost:5173)。前端会把 `/api` 代理到本机引擎。
+
+### 4. 索引
+
+页面打开后点顶部 **索引**。索引写在被阅读项目下的 `.code_archmage_index/`（已 gitignore），不上传、不进 git。
+
+## 目录
 
 ```
 code_archmage/
-├── engine/              # Python 引擎（tree-sitter + FastAPI + SQLite）
-│   ├── src/code_archmage/
-│   │   ├── parser/      # 解析（阶段 1）
-│   │   ├── indexer/     # 索引（阶段 2）
-│   │   ├── server/      # 服务（阶段 3）
-│   │   ├── llm/         # LLM 网关（阶段 5）
-│   │   └── cli.py       # 一键启动（阶段 6）
-│   └── tests/
-├── web/                 # React 前端（阶段 4 开始）
-│   ├── src/
-│   └── tests/
-├── plans/               # 规划文档
-│   ├── plan.md          # 产品技术规划
-│   ├── dev_workflow.md  # TDD 开发流程
-│   ├── reference/       # 历史输入文档
-│   └── decisions/       # ADR（架构决策记录）
-└── .github/workflows/   # CI
+├── engine/     # 解析、索引、本地 API、LLM 网关
+├── web/        # 阅读界面
+├── plans/      # 产品规划与架构决策
+└── .env.example
 ```
-
-## 开发流程
-
-本项目采用 **TDD（测试驱动开发）**。详见 [plans/dev_workflow.md](plans/dev_workflow.md)。
-
-## 开发进度
-
-- [x] 阶段 0：项目初始化
-- [ ] 阶段 1：解析器（tree-sitter → 符号/调用）
-- [ ] 阶段 2：索引器（SQLite + FTS5）
-- [ ] 阶段 3：服务层（FastAPI + 安全硬规则）
-- [ ] 阶段 4：垂直切片（前端基础阅读）
-- [ ] 阶段 5：加厚迭代（调用图、LLM、剥洋葱）
-- [ ] 阶段 6：发布准备
 
 ## 许可证
 

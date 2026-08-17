@@ -201,6 +201,7 @@ function AppInner(): JSX.Element {
             <CodeView
               ref={codeViewRef}
               content={fileContent.data.content}
+              calls={fileContent.data.calls}
               onSymbolClick={(line, col) =>
                 jumpFromPosition(fileContent.data.calls, line, col)
               }

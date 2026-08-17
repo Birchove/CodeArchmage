@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { CodeView, type CodeViewHandle } from "@/components/CodeView";
@@ -24,6 +24,36 @@ describe("CodeView — 基础渲染", () => {
     const { container } = render(<CodeView content="x = 1" />);
     // CodeMirror 挂载成功即说明 extensions（含 readOnly）未崩
     expect(container.querySelector(".cm-content")).not.toBeNull();
+  });
+
+  it("显示行号（.cm-gutter 存在）", () => {
+    const { container } = render(<CodeView content={"a = 1\nb = 2\n"} />);
+    // lineNumbers() 会渲染行号槽
+    expect(container.querySelector(".cm-gutter")).not.toBeNull();
+    expect(container.querySelector(".cm-lineNumbers")).not.toBeNull();
+  });
+
+  it("语法高亮：关键字被拆成带样式的 span", () => {
+    const { container } = render(
+      <CodeView content={"def hello():\n    pass\n"} />,
+    );
+    const line = container.querySelector(".cm-line");
+    expect(line).not.toBeNull();
+    expect(line!.querySelectorAll("span").length).toBeGreaterThan(0);
+    expect(container.textContent).toContain("def");
+  });
+
+  it("调用点带 cm-call-mark 标记", () => {
+    const { container } = render(
+      <CodeView
+        content={"foo()\n"}
+        calls={[{ callee_name: "foo", callee_id: 1, line: 1, col: 0 }]}
+      />,
+    );
+    expect(container.querySelector(".cm-call-mark")).not.toBeNull();
+    expect(container.querySelector(".cm-call-mark")?.textContent).toContain(
+      "foo",
+    );
   });
 });
 
@@ -52,9 +82,12 @@ describe("CodeView — 大文件护栏（O-4）", () => {
 describe("CodeView — scrollToLine ref", () => {
   it("ref 暴露 scrollToLine 方法（可调用，不崩）", () => {
     const ref = createRef<CodeViewHandle>();
-    render(<CodeView ref={ref} content={"a = 1\nb = 2\nc = 3\n"} />);
+    const { container } = render(
+      <CodeView ref={ref} content={"a = 1\nb = 2\nc = 3\n"} />,
+    );
     expect(typeof ref.current?.scrollToLine).toBe("function");
     // 调用不崩（实际滚动效果留 E2E）
     expect(() => ref.current?.scrollToLine(3)).not.toThrow();
+    expect(container.querySelector(".cm-jump-line")).not.toBeNull();
   });
 });

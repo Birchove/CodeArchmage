@@ -44,6 +44,7 @@ dist/
 build/
 .vite/
 coverage/
+.pnpm-store/
 
 # === Playwright ===
 test-results/

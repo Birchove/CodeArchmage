@@ -2,7 +2,7 @@
  * 只读代码视图（CodeMirror 6）。
  *
  * - 只读模式（EditorState.readOnly）
- * - Python 语法高亮
+ * - Python 语法高亮 + 当前行 / 跳转行 / 可点击调用点
  * - 大文件护栏（>2 万行 / >1MB 降级截断，O-4）
  * - ref 暴露 scrollToLine（实际滚动效果由 E2E 验证）
  * - 点击反查：coordsAtPos → {line, col} → onSymbolClick（决策 10，实际效果由 E2E 验证）
@@ -16,8 +16,20 @@ import {
   type JSX,
 } from "react";
 import { EditorState } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import {
+  EditorView,
+  drawSelection,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  lineNumbers,
+} from "@codemirror/view";
 import { python } from "@codemirror/lang-python";
+import type { CallOut } from "@/api/types";
+import {
+  callMarkExtension,
+  setJumpLine,
+  syntaxExtensions,
+} from "@/lib/highlight";
 
 /** 大文件护栏阈值（O-4）。 */
 const MAX_LINES = 20000;
@@ -25,12 +37,14 @@ const MAX_BYTES = 1024 * 1024; // 1 MB
 
 export interface CodeViewProps {
   content: string;
+  /** 当前文件调用点，用于可点击标记。 */
+  calls?: CallOut[];
   /** 点击代码区域时触发（line 1-based, col 0-based）。 */
   onSymbolClick?: (line: number, col: number) => void;
 }
 
 export interface CodeViewHandle {
-  /** 滚动到指定行（1-based）。实际效果由 E2E 验证。 */
+  /** 滚动到指定行（1-based）并高亮该行。 */
   scrollToLine: (line: number) => void;
 }
 
@@ -49,7 +63,7 @@ export function isTooLarge(content: string): boolean {
 }
 
 export const CodeView = forwardRef<CodeViewHandle, CodeViewProps>(
-  function CodeView({ content, onSymbolClick }, ref): JSX.Element {
+  function CodeView({ content, calls, onSymbolClick }, ref): JSX.Element {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
     // 用 ref 存最新的 onSymbolClick，避免 useEffect 依赖它导致 CM 重建
@@ -62,6 +76,12 @@ export const CodeView = forwardRef<CodeViewHandle, CodeViewProps>(
         doc: content,
         extensions: [
           python(),
+          ...syntaxExtensions,
+          callMarkExtension(calls ?? []),
+          lineNumbers(),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
+          drawSelection(),
           EditorState.readOnly.of(true),
           EditorView.lineWrapping,
         ],
@@ -85,20 +105,20 @@ export const CodeView = forwardRef<CodeViewHandle, CodeViewProps>(
         viewRef.current?.destroy();
         viewRef.current = null;
       };
-      // content 变化时重建（切换文件）
-    }, [content]);
+      // content / calls 变化时重建（切换文件）
+    }, [content, calls]);
 
     useImperativeHandle(ref, () => ({
       scrollToLine: (line: number) => {
         const view = viewRef.current;
         if (!view) return;
-        // 将 1-based 行号转为文档位置
-        const docLine = Math.max(0, line - 1);
-        const lineInfo = view.state.doc.line(
-          Math.min(docLine + 1, view.state.doc.lines),
-        );
+        const docLine = Math.max(1, Math.min(line, view.state.doc.lines));
+        const lineInfo = view.state.doc.line(docLine);
         view.dispatch({
-          effects: EditorView.scrollIntoView(lineInfo.from, { y: "center" }),
+          effects: [
+            EditorView.scrollIntoView(lineInfo.from, { y: "center" }),
+            setJumpLine.of(docLine),
+          ],
         });
       },
     }));
