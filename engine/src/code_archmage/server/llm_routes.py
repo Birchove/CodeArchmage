@@ -149,7 +149,7 @@ def _query_summary(conn: sqlite3.Connection, symbol_id: int) -> SummaryResult | 
     )
 
 
-async def _run_in_thread(db_path: Path, func: object, *args: object) -> object:  # type: ignore[type-arg]
+async def _run_in_thread(db_path: Path, func: object, *args: object) -> object:
     def _work() -> object:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
