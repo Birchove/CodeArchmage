@@ -10,6 +10,7 @@ import type {
   FileContentOut,
   FileTreeOut,
   IndexStatusOut,
+  LLMConfigOut,
   SymbolOut,
 } from "@/api/types";
 
@@ -34,6 +35,16 @@ export function makeSymbol(partial: Partial<SymbolOut>): SymbolOut {
 export function defaultHandlers() {
   return [
     http.get("*/api/health", () => HttpResponse.json({ status: "ok" })),
+    http.get("*/api/llm/config", () =>
+      HttpResponse.json<LLMConfigOut>({
+        configured: true,
+        status: "ok",
+        message: "LLM 已配置（模型：test）",
+        model: "test",
+        env_path: null,
+        missing_fields: [],
+      }),
+    ),
     http.get("*/api/index/status", () =>
       HttpResponse.json<IndexStatusOut>({
         file_count: 3,

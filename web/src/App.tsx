@@ -219,6 +219,8 @@ function AppInner(): JSX.Element {
             error: chat.error,
             draft: chatDraft,
             llmConfigured: llmConfig.data?.configured ?? false,
+            configMessage: llmConfig.data?.message ?? null,
+            configLoading: llmConfig.isPending,
             onDraftChange: handleDraftChange,
             onSend: handleSend,
             onRetry: handleRetry,

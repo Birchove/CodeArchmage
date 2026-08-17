@@ -75,9 +75,15 @@ export interface IndexStatusOut {
 // Stage 6：LLM 对话 + 摘要类型
 // ---------------------------------------------------------------------------
 
+export type LLMConfigStatus = "ok" | "not_found" | "incomplete" | "placeholder";
+
 export interface LLMConfigOut {
   configured: boolean;
+  status: LLMConfigStatus;
+  message: string;
   model?: string;
+  env_path?: string | null;
+  missing_fields?: string[];
 }
 
 export interface ChatMessage {

@@ -18,7 +18,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from code_archmage.llm.config import LLMConfig
+from code_archmage.llm.config import ConfigLoadResult, LLMConfig, result_from_injected_config
 from code_archmage.llm.context import build_context
 from code_archmage.llm.gateway import GatewayError, chat_stream
 from code_archmage.llm.prompts.chat_system import build_chat_system_prompt
@@ -33,6 +33,17 @@ from code_archmage.server.models import (
 llm_router = APIRouter()
 
 
+def _llm_status(request: Request) -> ConfigLoadResult:
+    status = getattr(request.app.state, "llm_status", None)
+    if isinstance(status, ConfigLoadResult):
+        return status
+    return result_from_injected_config(getattr(request.app.state, "llm_config", None))
+
+
+def _llm_unavailable(request: Request) -> HTTPException:
+    return HTTPException(503, _llm_status(request).message)
+
+
 # ---------------------------------------------------------------------------
 # GET /api/llm/config
 # ---------------------------------------------------------------------------
@@ -41,10 +52,16 @@ llm_router = APIRouter()
 @llm_router.get("/api/llm/config", response_model=LLMConfigOut)
 async def llm_config(request: Request) -> LLMConfigOut:
     """返回 LLM 配置状态。绝不含 api_key。"""
-    cfg: LLMConfig | None = request.app.state.llm_config
-    if cfg is None:
-        return LLMConfigOut(configured=False)
-    return LLMConfigOut(configured=True, model=cfg.model)
+    status = _llm_status(request)
+    cfg = status.config
+    return LLMConfigOut(
+        configured=cfg is not None,
+        status=str(status.status),
+        message=status.message,
+        model=cfg.model if cfg is not None else None,
+        env_path=str(status.env_path) if status.env_path is not None else None,
+        missing_fields=list(status.missing_fields),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +130,7 @@ async def chat_endpoint(request: Request, body: ChatRequest) -> StreamingRespons
     """
     cfg: LLMConfig | None = request.app.state.llm_config
     if cfg is None:
-        raise HTTPException(503, "LLM 未配置，请在 .env 设置 LLM_API_KEY")
+        raise _llm_unavailable(request)
 
     db_path: Path = request.app.state.db_path
     repo_root: Path = request.app.state.repo_root
@@ -166,7 +183,7 @@ async def get_summary(symbol_id: int, request: Request) -> SummaryResponse:
     """摘要缓存读取。未配置 LLM → 503。无缓存 → 404。"""
     cfg: LLMConfig | None = request.app.state.llm_config
     if cfg is None:
-        raise HTTPException(503, "LLM 未配置，请在 .env 设置 LLM_API_KEY")
+        raise _llm_unavailable(request)
 
     result = await _run_in_thread(request.app.state.db_path, _query_summary, symbol_id)
     if result is None:
@@ -200,7 +217,7 @@ async def create_summary(request: Request, body: SummaryRequest) -> SummaryRespo
     """惰性摘要生成。未配置 LLM → 503。"""
     cfg: LLMConfig | None = request.app.state.llm_config
     if cfg is None:
-        raise HTTPException(503, "LLM 未配置，请在 .env 设置 LLM_API_KEY")
+        raise _llm_unavailable(request)
 
     repo_root: Path = request.app.state.repo_root
     result = await _run_in_thread(

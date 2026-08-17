@@ -17,7 +17,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from code_archmage.llm.config import LLMConfig
+from code_archmage.llm.config import ConfigLoadResult, ConfigStatus, LLMConfig
 from code_archmage.server.app import create_app
 
 # ---------------------------------------------------------------------------
@@ -68,6 +68,8 @@ class TestLLMConfigEndpoint:
         data = resp.json()
         assert data["configured"] is True
         assert data["model"] == "m1"
+        assert data["status"] == "ok"
+        assert "已配置" in data["message"]
 
     def test_no_api_key_in_response(self, client_with_llm: TestClient) -> None:
         resp = client_with_llm.get("/api/llm/config")
@@ -77,7 +79,36 @@ class TestLLMConfigEndpoint:
     def test_configured_false_when_no_llm(self, client_no_llm: TestClient) -> None:
         resp = client_no_llm.get("/api/llm/config")
         assert resp.status_code == 200
-        assert resp.json()["configured"] is False
+        data = resp.json()
+        assert data["configured"] is False
+        assert data["status"] == "not_found"
+        assert "未找到" in data["message"]
+        assert "api_key" not in data
+
+    def test_incomplete_status_is_not_generic_unconfigured(
+        self, tmp_repo: Path
+    ) -> None:
+        status = ConfigLoadResult(
+            status=ConfigStatus.INCOMPLETE,
+            config=None,
+            env_path=tmp_repo / ".env",
+            missing_fields=("LLM_API_KEY",),
+            message="已找到 .env，但缺少 LLM_API_KEY。这三项都要填，和「完全没配 .env」不是同一回事。",
+        )
+        app = create_app(tmp_repo, dev_mode=False, llm_config=None, llm_status=status)
+        client = TestClient(app)
+        data = client.get("/api/llm/config").json()
+        assert data["configured"] is False
+        assert data["status"] == "incomplete"
+        assert "缺少 LLM_API_KEY" in data["message"]
+        assert data["missing_fields"] == ["LLM_API_KEY"]
+        chat = client.post(
+            "/api/chat",
+            json={"message": "x", "symbol_id": None, "history": []},
+        )
+        assert chat.status_code == 503
+        assert "缺少 LLM_API_KEY" in chat.json()["detail"]
+        assert "未配置" not in chat.json()["detail"]
 
 
 # ---------------------------------------------------------------------------

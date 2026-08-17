@@ -13,8 +13,11 @@ const defaultProps = {
   draft: "",
   symbolName: null,
   llmConfigured: true,
+  configMessage: null,
+  configLoading: false,
   onDraftChange: vi.fn(),
   onSend: vi.fn(),
+  onRetry: vi.fn(),
   onClear: vi.fn(),
   onAbort: vi.fn(),
 };
@@ -45,9 +48,18 @@ describe("ChatPanel", () => {
     expect(screen.getByText("myFunc")).toBeTruthy();
   });
 
-  it("LLM 未配置时显示警告", () => {
-    renderPanel({ llmConfigured: false });
-    expect(screen.getByText(/LLM 未配置/)).toBeTruthy();
+  it("未配置时显示后端给出的原因，而不是笼统的未配置", () => {
+    renderPanel({
+      llmConfigured: false,
+      configMessage: "已找到 .env，但缺少 LLM_API_KEY。",
+    });
+    expect(screen.getByText(/缺少 LLM_API_KEY/)).toBeTruthy();
+    expect(screen.queryByText(/请在引擎目录/)).toBeNull();
+  });
+
+  it("配置检查中不显示未配置警告", () => {
+    renderPanel({ llmConfigured: false, configLoading: true });
+    expect(document.querySelector(".chat-config-warning")).toBeNull();
   });
 
   it("输入框值由 draft prop 控制", () => {

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SymbolOut(BaseModel):
@@ -96,7 +96,11 @@ class LLMConfigOut(BaseModel):
     """LLM 配置状态（绝不含 api_key）。"""
 
     configured: bool
+    status: str
+    message: str
     model: str | None = None
+    env_path: str | None = None
+    missing_fields: list[str] = Field(default_factory=list)
 
 
 class ChatMessage(BaseModel):

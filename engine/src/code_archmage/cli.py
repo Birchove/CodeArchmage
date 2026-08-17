@@ -12,7 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from code_archmage.llm.config import load_config
+from code_archmage.llm.config import ConfigLoadResult, discover_llm_config
 from code_archmage.server.app import run_server
 
 
@@ -24,26 +24,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("repo_path", type=Path, help="要索引的仓库根目录")
     parser.add_argument("--port", type=int, default=8765, help="服务端口（默认 8765）")
+    parser.add_argument(
+        "--env",
+        type=Path,
+        default=None,
+        help="指定 .env 路径（默认：被阅读仓库、当前目录、本工具根目录）",
+    )
 
     args = parser.parse_args(argv)
 
-    repo: Path = args.repo_path
+    repo: Path = args.repo_path.expanduser()
     if not repo.exists():
         print(f"错误：仓库路径不存在：{repo}", file=sys.stderr)
         return 1
     if not repo.is_dir():
         print(f"错误：路径不是目录：{repo}", file=sys.stderr)
         return 1
+    repo = repo.resolve()
 
-    # 尝试加载 .env（repo 根目录或 cwd）
-    llm_cfg = load_config(repo / ".env") or load_config(None)
-    if llm_cfg:
-        print(f"Code Archmage — LLM 已配置（模型：{llm_cfg.model}）")
-    else:
-        print("Code Archmage — LLM 未配置（对话/摘要功能不可用，可在 .env 设置 LLM_API_KEY）")
-
+    env_arg = args.env.expanduser().resolve() if args.env is not None else None
+    llm_status: ConfigLoadResult = discover_llm_config(repo, env_arg)
+    print(f"Code Archmage — {llm_status.message}")
     print(f"Code Archmage — 启动服务（仓库：{repo}，端口：{args.port}）")
-    run_server(repo, port=args.port, dev_mode=False, llm_config=llm_cfg)
+    run_server(
+        repo,
+        port=args.port,
+        dev_mode=False,
+        llm_config=llm_status.config,
+        llm_status=llm_status,
+    )
     return 0
 
 

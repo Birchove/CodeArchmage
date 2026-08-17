@@ -17,6 +17,8 @@ interface ChatPanelProps {
   draft: string;
   symbolName: string | null;
   llmConfigured: boolean;
+  configMessage?: string | null;
+  configLoading?: boolean;
   onDraftChange: (text: string) => void;
   onSend: () => void;
   onRetry: () => void;
@@ -31,6 +33,8 @@ export function ChatPanel({
   draft,
   symbolName,
   llmConfigured,
+  configMessage = null,
+  configLoading = false,
   onDraftChange,
   onSend,
   onRetry,
@@ -63,10 +67,10 @@ export function ChatPanel({
       ) : (
         <div className="chat-context-hint">无上下文</div>
       )}
-      {!llmConfigured && (
+      {!configLoading && !llmConfigured && (
         <div className="chat-config-warning">
-          LLM 未配置。请在引擎目录的 <code>.env</code> 中设置{" "}
-          <code>LLM_API_KEY</code>。
+          {configMessage ??
+            "未找到 .env。请把 .env.example 复制到本工具仓库根目录（与 engine/、web/ 同级），填写 LLM_API_KEY、LLM_BASE_URL、LLM_MODEL 后重启引擎。"}
         </div>
       )}
       <div className="chat-messages" ref={scrollRef}>

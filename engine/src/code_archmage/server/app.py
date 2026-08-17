@@ -14,7 +14,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from code_archmage.indexer.schema import init_db
-from code_archmage.llm.config import LLMConfig
+from code_archmage.llm.config import (
+    ConfigLoadResult,
+    LLMConfig,
+    result_from_injected_config,
+)
 
 # 开发模式下允许的前端来源（Vite 默认端口 5173）
 _DEV_ORIGINS = [
@@ -28,6 +32,7 @@ def create_app(
     db_path: Path | None = None,
     dev_mode: bool = False,
     llm_config: LLMConfig | None = None,
+    llm_status: ConfigLoadResult | None = None,
 ) -> FastAPI:
     """创建 FastAPI 应用。
 
@@ -36,6 +41,7 @@ def create_app(
         db_path: 索引库路径，默认 repo_root / ".code_archmage_index" / "index.sqlite"
         dev_mode: 开发模式（注册 CORS 中间件，允许 Vite dev server 端口）
         llm_config: LLM 网关配置（可选）；传 None 时 LLM 端点返回 503
+        llm_status: 配置加载详情（找不到 / 缺字段 / 占位值），供 /api/llm/config 返回友好说明
     """
     if db_path is None:
         db_path = repo_root / ".code_archmage_index" / "index.sqlite"
@@ -47,11 +53,17 @@ def create_app(
     conn = init_db(db_path)
     conn.close()
 
+    if llm_status is None:
+        llm_status = result_from_injected_config(llm_config)
+    if llm_config is None:
+        llm_config = llm_status.config
+
     app = FastAPI(title="Code Archmage")
     app.state.repo_root = Path(repo_root)
     app.state.db_path = db_path
     app.state.dev_mode = dev_mode
     app.state.llm_config = llm_config  # LLMConfig | None
+    app.state.llm_status = llm_status
     # B-1: 索引并发互斥锁（同步索引防双击双跑）
     app.state.index_lock = threading.Lock()
 
@@ -78,14 +90,20 @@ def run_server(
     port: int = 8765,
     dev_mode: bool = False,
     llm_config: LLMConfig | None = None,
+    llm_status: ConfigLoadResult | None = None,
 ) -> None:
     """启动 uvicorn 服务。
 
     安全硬规则 1：host 强制 127.0.0.1，传 0.0.0.0 等非回环地址一律改回。
     端口默认 8765（与 .env.example 的 SERVER_PORT 一致）。
-    dev_mode / llm_config 透传给 create_app。
+    dev_mode / llm_config / llm_status 透传给 create_app。
     """
     if host not in ("127.0.0.1", "localhost"):
         host = "127.0.0.1"
-    app = create_app(repo_root, dev_mode=dev_mode, llm_config=llm_config)
+    app = create_app(
+        repo_root,
+        dev_mode=dev_mode,
+        llm_config=llm_config,
+        llm_status=llm_status,
+    )
     uvicorn.run(app, host=host, port=port)

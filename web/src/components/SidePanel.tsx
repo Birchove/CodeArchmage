@@ -2,9 +2,9 @@
  * 右侧面板（阶段 5-6）。
  *
  * 三标签页：调用图 / 剥洋葱 / 对话。
- * cc B-2：标签页切换保持挂载（visibility 控制），避免 react-flow 容器测量为 0
+ * 标签页切换保持挂载（CSS 隐藏，不用 display:none），避免 react-flow 容器测量为 0
  * 和 useCallChain 每次切回全量重跑。
- * 面板可折叠（折叠时 visibility:hidden + width:0，保持挂载）。
+ * 面板可折叠：收起后只留右侧窄条和展开按钮（不能把整栏 visibility:hidden）。
  *
  * Stage 6 S-1：对话标签页的 chat 状态由 App 层管理（切换符号 = 开新对话）。
  * Stage 6：对话标签激活时 aside 加 aside-chat class（自身加宽到 400px）。
@@ -20,6 +20,14 @@ import type { ChatMessage, SymbolOut } from "@/api/types";
 
 type Tab = "callgraph" | "onion" | "chat";
 
+function paneProps(active: boolean) {
+  return {
+    className: active ? "sidepanel-pane active" : "sidepanel-pane",
+    "aria-hidden": !active,
+    ...(!active ? { inert: true } : {}),
+  };
+}
+
 interface SidePanelProps {
   selectedSymbol: SymbolOut | null;
   onNodeSelect: (sym: SymbolOut) => void;
@@ -30,6 +38,8 @@ interface SidePanelProps {
     error: string | null;
     draft: string;
     llmConfigured: boolean;
+    configMessage?: string | null;
+    configLoading?: boolean;
     onDraftChange: (text: string) => void;
     onSend: () => void;
     onRetry: () => void;
@@ -116,14 +126,8 @@ export function SidePanel({
         </button>
       </div>
       <div className="sidepanel-content">
-        {/* cc B-2：所有面板都保持挂载，用 visibility 控制显示 */}
-        <div
-          className={
-            activeTab === "callgraph"
-              ? "sidepanel-pane active"
-              : "sidepanel-pane"
-          }
-        >
+        {/* 三个面板保持挂载；非当前页 inert + CSS 隐藏，避免调用图穿透叠在剥洋葱上 */}
+        <div {...paneProps(activeTab === "callgraph")}>
           {selectedSymbol ? (
             callers.isLoading || callees.isLoading ? (
               <Spinner />
@@ -139,11 +143,7 @@ export function SidePanel({
             <p className="sidepanel-empty">选中符号后显示调用关系</p>
           )}
         </div>
-        <div
-          className={
-            activeTab === "onion" ? "sidepanel-pane active" : "sidepanel-pane"
-          }
-        >
+        <div {...paneProps(activeTab === "onion")}>
           {selectedSymbol ? (
             <OnionView
               symbolId={selectedSymbol.id}
@@ -153,11 +153,7 @@ export function SidePanel({
             <p className="sidepanel-empty">选中符号后显示调用链</p>
           )}
         </div>
-        <div
-          className={
-            activeTab === "chat" ? "sidepanel-pane active" : "sidepanel-pane"
-          }
-        >
+        <div {...paneProps(activeTab === "chat")}>
           <ChatPanel
             messages={chat.messages}
             isStreaming={chat.isStreaming}
@@ -165,6 +161,8 @@ export function SidePanel({
             draft={chat.draft}
             symbolName={selectedSymbol?.name ?? null}
             llmConfigured={chat.llmConfigured}
+            configMessage={chat.configMessage}
+            configLoading={chat.configLoading}
             onDraftChange={chat.onDraftChange}
             onSend={chat.onSend}
             onRetry={chat.onRetry}

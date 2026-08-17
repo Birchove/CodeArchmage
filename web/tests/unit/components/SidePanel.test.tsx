@@ -216,8 +216,18 @@ describe("SidePanel — cc B-2 标签页保持挂载", () => {
       expect(screen.getByTestId("onion-view")).toBeInTheDocument(),
     );
 
-    // 调用图仍挂载（在 DOM 中，只是 visibility:hidden）
+    // 调用图仍挂载（在 DOM 中，只是非 active）
     expect(screen.getByTestId("callgraph")).toBeInTheDocument();
+    expect(screen.getByTestId("callgraph").closest(".sidepanel-pane")).not.toHaveClass(
+      "active",
+    );
+    expect(screen.getByTestId("onion-view").closest(".sidepanel-pane")).toHaveClass(
+      "active",
+    );
+    expect(document.querySelectorAll(".sidepanel-pane.active")).toHaveLength(1);
+    expect(
+      screen.getByTestId("callgraph").closest(".sidepanel-pane"),
+    ).toHaveAttribute("aria-hidden", "true");
   });
 });
 
@@ -251,6 +261,25 @@ describe("SidePanel — 折叠功能", () => {
     // 按钮文案变为展开
     expect(
       screen.getByRole("button", { name: /展开面板/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("折叠后再点箭头 → 展开，去掉 aside-collapsed", () => {
+    renderWithQueryClient(
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /折叠面板/i }));
+    fireEvent.click(screen.getByRole("button", { name: /展开面板/i }));
+
+    expect(document.querySelector(".app-aside")).not.toHaveClass(
+      "aside-collapsed",
+    );
+    expect(
+      screen.getByRole("button", { name: /折叠面板/i }),
     ).toBeInTheDocument();
   });
 });

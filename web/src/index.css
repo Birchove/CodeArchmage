@@ -138,7 +138,7 @@ body {
 
 .app-body {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
+  grid-template-columns: 280px 1fr auto;
   overflow: hidden;
 }
 
@@ -400,17 +400,34 @@ body {
 
 /* === 右侧面板（阶段 5） === */
 .app-aside {
+  width: 320px;
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* cc B-2：折叠时保持挂载 + visibility:hidden + width:0 */
+/* 折叠后只留一条窄边放展开按钮。不能 width:0 + visibility:hidden，
+   否则按钮自己也被藏掉，再也点不回来。 */
 .app-aside.aside-collapsed {
-  width: 0;
+  width: 32px;
+  min-width: 32px;
+}
+
+.app-aside.aside-collapsed .sidepanel-tabs,
+.app-aside.aside-collapsed .sidepanel-content {
+  display: none;
+}
+
+.app-aside.aside-collapsed .sidepanel-header {
+  border-bottom: none;
+  flex: 1;
+}
+
+.app-aside.aside-collapsed .aside-toggle {
+  flex: 1;
+  width: 100%;
   border-left: none;
-  visibility: hidden;
 }
 
 .sidepanel-header {
@@ -459,15 +476,23 @@ body {
   position: relative;
 }
 
-/* cc B-2：面板保持挂载，用 visibility 控制显示（非 display:none） */
+/* 三个标签页叠在同一区域，保持挂载（react-flow 量尺寸、剥洋葱不反复请求）。
+   不能只用 visibility:hidden：xyflow 节点会给自己 visibility:visible，
+   会穿透父级显示出来；节点/控件的 z-index 也会盖住后面的面板。 */
 .sidepanel-pane {
   position: absolute;
   inset: 0;
   overflow: auto;
+  z-index: 0;
+  opacity: 0;
   visibility: hidden;
+  pointer-events: none;
 }
 .sidepanel-pane.active {
+  z-index: 1;
+  opacity: 1;
   visibility: visible;
+  pointer-events: auto;
 }
 
 .sidepanel-empty,
@@ -598,10 +623,9 @@ body {
 }
 
 /* === 对话面板（阶段 6） === */
-/* Stage 6：对话标签激活时 aside 自身加宽到 400px（不动 grid） */
-.app-aside.aside-chat {
+/* 对话标签加宽；折叠时仍走 32px 窄边，不能被这条盖掉 */
+.app-aside.aside-chat:not(.aside-collapsed) {
   width: 400px;
-  flex: 0 0 400px;
 }
 
 .chat-panel {
