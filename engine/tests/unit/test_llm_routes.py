@@ -85,9 +85,7 @@ class TestLLMConfigEndpoint:
         assert "未找到" in data["message"]
         assert "api_key" not in data
 
-    def test_incomplete_status_is_not_generic_unconfigured(
-        self, tmp_repo: Path
-    ) -> None:
+    def test_incomplete_status_is_not_generic_unconfigured(self, tmp_repo: Path) -> None:
         status = ConfigLoadResult(
             status=ConfigStatus.INCOMPLETE,
             config=None,

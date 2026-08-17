@@ -171,9 +171,7 @@ class TestDiscoverLlmConfig:
 
     def _write_ok_env(self, path: Path, model: str = "root-model") -> None:
         path.write_text(
-            "LLM_API_KEY=sk-root\n"
-            "LLM_BASE_URL=https://api.example.com/v1\n"
-            f"LLM_MODEL={model}\n"
+            f"LLM_API_KEY=sk-root\nLLM_BASE_URL=https://api.example.com/v1\nLLM_MODEL={model}\n"
         )
 
     def test_finds_env_in_tool_root_when_cwd_is_engine(
@@ -191,9 +189,7 @@ class TestDiscoverLlmConfig:
         assert result.config.model == "from-tool-root"
         assert "sk-root" not in result.message
 
-    def test_explicit_env_path_wins(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_explicit_env_path_wins(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         tool = tmp_path / "code_archmage"
         (tool / "engine").mkdir(parents=True)
         (tool / "web").mkdir()
@@ -219,4 +215,3 @@ class TestDiscoverLlmConfig:
         assert "缺少" in result.message
         assert "LLM_API_KEY" in result.message
         assert "未找到" not in result.message
-

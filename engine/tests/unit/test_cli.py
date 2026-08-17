@@ -63,9 +63,7 @@ class TestCLI:
     ) -> None:
         env = tmp_path / "custom.env"
         env.write_text(
-            "LLM_API_KEY=sk-test\n"
-            "LLM_BASE_URL=https://example.com/v1\n"
-            "LLM_MODEL=custom-model\n"
+            "LLM_API_KEY=sk-test\nLLM_BASE_URL=https://example.com/v1\nLLM_MODEL=custom-model\n"
         )
         with patch("code_archmage.cli.run_server") as mock_run:
             code = main([str(tmp_path), "--env", str(env)])
