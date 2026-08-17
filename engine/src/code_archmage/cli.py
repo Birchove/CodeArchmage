@@ -12,6 +12,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from code_archmage.llm.config import load_config
 from code_archmage.server.app import run_server
 
 
@@ -34,8 +35,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"错误：路径不是目录：{repo}", file=sys.stderr)
         return 1
 
+    # 尝试加载 .env（repo 根目录或 cwd）
+    llm_cfg = load_config(repo / ".env") or load_config(None)
+    if llm_cfg:
+        print(f"Code Archmage — LLM 已配置（模型：{llm_cfg.model}）")
+    else:
+        print("Code Archmage — LLM 未配置（对话/摘要功能不可用，可在 .env 设置 LLM_API_KEY）")
+
     print(f"Code Archmage — 启动服务（仓库：{repo}，端口：{args.port}）")
-    run_server(repo, port=args.port)
+    run_server(repo, port=args.port, dev_mode=False, llm_config=llm_cfg)
     return 0
 
 

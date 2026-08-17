@@ -85,3 +85,45 @@ class IndexStatusOut(BaseModel):
     schema_version: str
     repo_root: str
     db_path: str
+
+
+# ---------------------------------------------------------------------------
+# Stage 6：LLM 对话 + 摘要相关模型
+# ---------------------------------------------------------------------------
+
+
+class LLMConfigOut(BaseModel):
+    """LLM 配置状态（绝不含 api_key）。"""
+
+    configured: bool
+    model: str | None = None
+
+
+class ChatMessage(BaseModel):
+    """对话历史消息。"""
+
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """对话请求。"""
+
+    message: str
+    symbol_id: int | None = None
+    history: list[ChatMessage] = []
+
+
+class SummaryResponse(BaseModel):
+    """摘要响应。"""
+
+    symbol_id: int
+    summary_text: str
+    model: str
+    cached: bool
+
+
+class SummaryRequest(BaseModel):
+    """摘要生成请求。"""
+
+    symbol_id: int
