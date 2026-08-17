@@ -9,6 +9,7 @@
 import { type JSX } from "react";
 import { useCallChain } from "@/hooks/useCallChain";
 import { Spinner } from "@/components/Spinner";
+import { SummaryInline } from "@/components/SummaryInline";
 import type { SymbolOut } from "@/api/types";
 
 interface OnionViewProps {
@@ -59,6 +60,7 @@ export function OnionView({
                   <span className="onion-node-file">
                     {sym.file_path}:{sym.line}
                   </span>
+                  {isCurrent && <SummaryInline symbolId={sym.id} />}
                 </li>
               );
             })}

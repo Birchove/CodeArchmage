@@ -21,6 +21,8 @@ import { useIndexStatus } from "@/hooks/useIndexStatus";
 import { useTriggerIndex } from "@/hooks/useTriggerIndex";
 import { useHealth } from "@/hooks/useHealth";
 import { useJumpToDefinition } from "@/hooks/useJumpToDefinition";
+import { useChat } from "@/hooks/useChat";
+import { useLLMConfig } from "@/hooks/useLLMConfig";
 import { buildTree } from "@/lib/tree";
 import { ApiError } from "@/api/client";
 import { getSymbolById } from "@/api/endpoints";
@@ -55,6 +57,34 @@ function AppInner(): JSX.Element {
   const fileTree = useFileTree();
   const fileContent = useFileContent(selectedFile);
   const triggerIndex = useTriggerIndex();
+  const llmConfig = useLLMConfig();
+
+  // Stage 6：对话状态提升到 App 层（S-1：切换符号 = 开新对话）
+  const chat = useChat();
+  const [chatDraft, setChatDraft] = useState("");
+
+  // S-1：切换符号时清空对话 + 草稿（开新对话）
+  useEffect(() => {
+    chat.clear();
+    setChatDraft("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSymbol?.id]);
+
+  // 草稿保活：切换标签不丢失（draft 存 state，由 ChatPanel 受控）
+  const handleDraftChange = useCallback((text: string) => {
+    setChatDraft(text);
+  }, []);
+
+  const handleSend = useCallback(() => {
+    const text = chatDraft;
+    if (!text.trim()) return;
+    setChatDraft("");
+    chat.send(text, selectedSymbol?.id ?? null);
+  }, [chat, chatDraft, selectedSymbol?.id]);
+
+  const handleRetry = useCallback(() => {
+    chat.retry(selectedSymbol?.id ?? null);
+  }, [chat, selectedSymbol?.id]);
 
   // 统一选中符号回调（阶段 5 §2.5）：设置 selectedSymbol + 打开文件/滚动
   const selectSymbol = useCallback(
@@ -182,6 +212,18 @@ function AppInner(): JSX.Element {
         <SidePanel
           selectedSymbol={selectedSymbol}
           onNodeSelect={selectSymbol}
+          chat={{
+            messages: chat.messages,
+            isStreaming: chat.isStreaming,
+            error: chat.error,
+            draft: chatDraft,
+            llmConfigured: llmConfig.data?.configured ?? false,
+            onDraftChange: handleDraftChange,
+            onSend: handleSend,
+            onRetry: handleRetry,
+            onClear: chat.clear,
+            onAbort: chat.abort,
+          }}
         />
       </div>
     </div>

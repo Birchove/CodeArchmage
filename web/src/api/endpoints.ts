@@ -47,3 +47,36 @@ export const getCallers = (symbolId: number): Promise<SymbolOut[]> =>
 /** 查询符号的直接被调用者（含多候选，cc S-2）。 */
 export const getCallees = (symbolId: number): Promise<SymbolOut[]> =>
   apiGet<SymbolOut[]>(`/symbols/${symbolId}/callees`);
+
+// ---------------------------------------------------------------------------
+// Stage 6：LLM 对话 + 摘要端点
+// ---------------------------------------------------------------------------
+
+import type { LLMConfigOut, SummaryResponse } from "./types";
+
+export const getLLMConfig = (): Promise<LLMConfigOut> =>
+  apiGet<LLMConfigOut>("/llm/config");
+
+/** 获取摘要缓存（不存在时后端返回 404）。 */
+export const getSummary = (symbolId: number): Promise<SummaryResponse> =>
+  apiGet<SummaryResponse>(`/summaries/${symbolId}`);
+
+/** 惰性生成摘要（有缓存直接返回）。 */
+export const createSummary = (symbolId: number): Promise<SummaryResponse> =>
+  apiPost<SummaryResponse>("/summaries", { symbol_id: symbolId });
+
+/** 获取 /api/chat 的 fetch Response（调用方处理 SSE 流）。 */
+export const fetchChat = (
+  message: string,
+  symbolId: number | null,
+  history: Array<{ role: string; content: string }>,
+  signal?: AbortSignal | null,
+): Promise<Response> => {
+  const BASE = "/api";
+  return fetch(`${BASE}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, symbol_id: symbolId, history }),
+    signal: signal ?? undefined,
+  });
+};

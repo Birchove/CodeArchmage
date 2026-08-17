@@ -13,6 +13,18 @@ import { http, HttpResponse } from "msw";
 import { OnionView } from "@/components/OnionView";
 import type { SymbolOut } from "@/api/types";
 
+// SummaryInline 内嵌于 OnionView，mock useSummary 避免需要 QueryClientProvider
+vi.mock("@/hooks/useSummary", () => ({
+  useSummary: () => ({
+    summary: undefined,
+    isLoading: false,
+    error: null,
+    generate: vi.fn(),
+    isGenerating: false,
+    generateError: null,
+  }),
+}));
+
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));

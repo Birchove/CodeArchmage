@@ -7,6 +7,7 @@
 
 import { type JSX } from "react";
 import type { SymbolOut } from "@/api/types";
+import { SummaryInline } from "@/components/SummaryInline";
 
 interface SymbolOutlineProps {
   symbols: SymbolOut[];
@@ -41,6 +42,7 @@ export function SymbolOutline({
             <span className="symbol-name">{s.name}</span>
             <span className="symbol-line">:{s.line}</span>
           </button>
+          <SummaryInline symbolId={s.id} />
         </li>
       ))}
     </ul>

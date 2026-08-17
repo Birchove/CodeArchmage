@@ -1,29 +1,47 @@
 /**
- * 右侧面板（阶段 5 循环 10）。
+ * 右侧面板（阶段 5-6）。
  *
- * 双标签页：调用图 / 剥洋葱。
+ * 三标签页：调用图 / 剥洋葱 / 对话。
  * cc B-2：标签页切换保持挂载（visibility 控制），避免 react-flow 容器测量为 0
- * 和 useCallChain 每次切回全量重跑（111 次请求）。
+ * 和 useCallChain 每次切回全量重跑。
  * 面板可折叠（折叠时 visibility:hidden + width:0，保持挂载）。
+ *
+ * Stage 6 S-1：对话标签页的 chat 状态由 App 层管理（切换符号 = 开新对话）。
+ * Stage 6：对话标签激活时 aside 加 aside-chat class（自身加宽到 400px）。
  */
 import { type JSX, useState } from "react";
 import { CallGraph } from "@/components/CallGraph";
 import { OnionView } from "@/components/OnionView";
+import { ChatPanel } from "@/components/ChatPanel";
 import { useCallers } from "@/hooks/useCallers";
 import { useCallees } from "@/hooks/useCallees";
 import { Spinner } from "@/components/Spinner";
-import type { SymbolOut } from "@/api/types";
+import type { ChatMessage, SymbolOut } from "@/api/types";
 
-type Tab = "callgraph" | "onion";
+type Tab = "callgraph" | "onion" | "chat";
 
 interface SidePanelProps {
   selectedSymbol: SymbolOut | null;
   onNodeSelect: (sym: SymbolOut) => void;
+  // Stage 6：对话状态由 App 层传入（S-1：切换符号 = 开新对话）
+  chat: {
+    messages: ChatMessage[];
+    isStreaming: boolean;
+    error: string | null;
+    draft: string;
+    llmConfigured: boolean;
+    onDraftChange: (text: string) => void;
+    onSend: () => void;
+    onRetry: () => void;
+    onClear: () => void;
+    onAbort: () => void;
+  };
 }
 
 export function SidePanel({
   selectedSymbol,
   onNodeSelect,
+  chat,
 }: SidePanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<Tab>("callgraph");
   const [collapsed, setCollapsed] = useState(false);
@@ -31,8 +49,25 @@ export function SidePanel({
   const callers = useCallers(selectedSymbol?.id ?? null);
   const callees = useCallees(selectedSymbol?.id ?? null);
 
+  // R-2：切换标签时 abort 流式对话（离开 chat 标签时）
+  const handleTabChange = (tab: Tab) => {
+    if (activeTab === "chat" && tab !== "chat") {
+      chat.onAbort();
+    }
+    setActiveTab(tab);
+  };
+
+  // Stage 6：对话标签激活时加宽
+  const asideClass = [
+    "app-aside",
+    collapsed ? "aside-collapsed" : "",
+    activeTab === "chat" ? "aside-chat" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <aside className={collapsed ? "app-aside aside-collapsed" : "app-aside"}>
+    <aside className={asideClass}>
       <div className="sidepanel-header">
         <div className="sidepanel-tabs" role="tablist">
           <button
@@ -44,7 +79,7 @@ export function SidePanel({
                 ? "sidepanel-tab active"
                 : "sidepanel-tab"
             }
-            onClick={() => setActiveTab("callgraph")}
+            onClick={() => handleTabChange("callgraph")}
           >
             调用图
           </button>
@@ -55,9 +90,20 @@ export function SidePanel({
             className={
               activeTab === "onion" ? "sidepanel-tab active" : "sidepanel-tab"
             }
-            onClick={() => setActiveTab("onion")}
+            onClick={() => handleTabChange("onion")}
           >
             剥洋葱
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "chat"}
+            className={
+              activeTab === "chat" ? "sidepanel-tab active" : "sidepanel-tab"
+            }
+            onClick={() => handleTabChange("chat")}
+          >
+            对话
           </button>
         </div>
         <button
@@ -70,7 +116,7 @@ export function SidePanel({
         </button>
       </div>
       <div className="sidepanel-content">
-        {/* cc B-2：两个面板都保持挂载，用 visibility 控制显示 */}
+        {/* cc B-2：所有面板都保持挂载，用 visibility 控制显示 */}
         <div
           className={
             activeTab === "callgraph"
@@ -106,6 +152,25 @@ export function SidePanel({
           ) : (
             <p className="sidepanel-empty">选中符号后显示调用链</p>
           )}
+        </div>
+        <div
+          className={
+            activeTab === "chat" ? "sidepanel-pane active" : "sidepanel-pane"
+          }
+        >
+          <ChatPanel
+            messages={chat.messages}
+            isStreaming={chat.isStreaming}
+            error={chat.error}
+            draft={chat.draft}
+            symbolName={selectedSymbol?.name ?? null}
+            llmConfigured={chat.llmConfigured}
+            onDraftChange={chat.onDraftChange}
+            onSend={chat.onSend}
+            onRetry={chat.onRetry}
+            onClear={chat.onClear}
+            onAbort={chat.onAbort}
+          />
         </div>
       </div>
     </aside>

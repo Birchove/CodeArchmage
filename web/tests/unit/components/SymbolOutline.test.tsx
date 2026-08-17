@@ -3,6 +3,18 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { SymbolOutline } from "@/components/SymbolOutline";
 import type { SymbolOut } from "@/api/types";
 
+// SummaryInline 内嵌于 SymbolOutline，mock useSummary 避免需要 QueryClientProvider
+vi.mock("@/hooks/useSummary", () => ({
+  useSummary: () => ({
+    summary: undefined,
+    isLoading: false,
+    error: null,
+    generate: vi.fn(),
+    isGenerating: false,
+    generateError: null,
+  }),
+}));
+
 function sym(partial: Partial<SymbolOut>): SymbolOut {
   return {
     id: 1,
@@ -44,7 +56,9 @@ describe("SymbolOutline — 渲染", () => {
       sym({ id: 1, name: "first", line: 5 }),
     ];
     render(<SymbolOutline symbols={symbols} onSelect={vi.fn()} />);
-    const items = screen.getAllByRole("button");
+    // 只取符号按钮（SummaryInline 的"生成摘要"按钮也有 role=button）
+    const items = document.querySelectorAll("button.symbol-item");
+    expect(items).toHaveLength(2);
     expect(items[0]).toHaveTextContent("first");
     expect(items[1]).toHaveTextContent("second");
   });

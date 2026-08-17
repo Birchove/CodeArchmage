@@ -70,3 +70,24 @@ export interface IndexStatusOut {
   repo_root: string;
   db_path: string;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 6：LLM 对话 + 摘要类型
+// ---------------------------------------------------------------------------
+
+export interface LLMConfigOut {
+  configured: boolean;
+  model?: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface SummaryResponse {
+  symbol_id: number;
+  summary_text: string;
+  model: string;
+  cached: boolean;
+}

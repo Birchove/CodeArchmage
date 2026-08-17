@@ -12,9 +12,9 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { renderWithQueryClient } from "@/test/test-utils";
 import { SidePanel } from "@/components/SidePanel";
-import type { SymbolOut } from "@/api/types";
+import type { ChatMessage, SymbolOut } from "@/api/types";
 
-// Mock CallGraph 和 OnionView 以避免 react-flow / API 调用在 jsdom 中的问题
+// Mock CallGraph、OnionView、ChatPanel 以避免 react-flow / API / SSE 在 jsdom 中的问题
 vi.mock("@/components/CallGraph", () => ({
   CallGraph: ({
     center,
@@ -39,6 +39,12 @@ vi.mock("@/components/OnionView", () => ({
   ),
 }));
 
+vi.mock("@/components/ChatPanel", () => ({
+  ChatPanel: ({ symbolName }: { symbolName: string | null }) => (
+    <div data-testid="chat-panel" data-symbol={symbolName ?? "none"} />
+  ),
+}));
+
 const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
@@ -57,10 +63,26 @@ function makeSym(overrides: Partial<SymbolOut> = {}): SymbolOut {
   };
 }
 
+const mockChat = {
+  messages: [] as ChatMessage[],
+  isStreaming: false,
+  error: null,
+  draft: "",
+  llmConfigured: true,
+  onDraftChange: vi.fn(),
+  onSend: vi.fn(),
+  onClear: vi.fn(),
+  onAbort: vi.fn(),
+};
+
 describe("SidePanel — 循环 10", () => {
   it("无 selectedSymbol → 空状态", () => {
     renderWithQueryClient(
-      <SidePanel selectedSymbol={null} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
     expect(screen.getByText(/选中符号后显示调用关系/i)).toBeInTheDocument();
   });
@@ -72,7 +94,11 @@ describe("SidePanel — 循环 10", () => {
       http.get("*/api/symbols/1/callees", () => HttpResponse.json([])),
     );
     renderWithQueryClient(
-      <SidePanel selectedSymbol={sym} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={sym}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
     await waitFor(() =>
       expect(screen.getByTestId("callgraph")).toBeInTheDocument(),
@@ -86,7 +112,11 @@ describe("SidePanel — 循环 10", () => {
       http.get("*/api/symbols/1/callees", () => HttpResponse.json([])),
     );
     renderWithQueryClient(
-      <SidePanel selectedSymbol={sym} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={sym}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
 
     const onionTab = screen.getByRole("tab", { name: /剥洋葱/i });
@@ -99,13 +129,64 @@ describe("SidePanel — 循环 10", () => {
 
   it("标签页 aria-selected 状态正确", () => {
     renderWithQueryClient(
-      <SidePanel selectedSymbol={null} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
     const callgraphTab = screen.getByRole("tab", { name: /调用图/i });
     const onionTab = screen.getByRole("tab", { name: /剥洋葱/i });
+    const chatTab = screen.getByRole("tab", { name: /对话/i });
 
     expect(callgraphTab).toHaveAttribute("aria-selected", "true");
     expect(onionTab).toHaveAttribute("aria-selected", "false");
+    expect(chatTab).toHaveAttribute("aria-selected", "false");
+  });
+});
+
+describe("SidePanel — 循环 14 对话标签", () => {
+  it("点击对话标签 → 显示 ChatPanel", () => {
+    renderWithQueryClient(
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /对话/i }));
+    expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
+  });
+
+  it("对话标签激活时 aside 加 aside-chat class", () => {
+    renderWithQueryClient(
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /对话/i }));
+    const aside = document.querySelector(".app-aside");
+    expect(aside).toHaveClass("aside-chat");
+  });
+
+  it("切回调用图时 aside 移除 aside-chat class", () => {
+    renderWithQueryClient(
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
+    );
+    // 切到对话
+    fireEvent.click(screen.getByRole("tab", { name: /对话/i }));
+    expect(document.querySelector(".app-aside")).toHaveClass("aside-chat");
+    // 切回调用图
+    fireEvent.click(screen.getByRole("tab", { name: /调用图/i }));
+    expect(document.querySelector(".app-aside")).not.toHaveClass(
+      "aside-chat",
+    );
   });
 });
 
@@ -117,7 +198,11 @@ describe("SidePanel — cc B-2 标签页保持挂载", () => {
       http.get("*/api/symbols/1/callees", () => HttpResponse.json([])),
     );
     renderWithQueryClient(
-      <SidePanel selectedSymbol={sym} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={sym}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
 
     // 等调用图加载
@@ -139,7 +224,11 @@ describe("SidePanel — cc B-2 标签页保持挂载", () => {
 describe("SidePanel — 折叠功能", () => {
   it("折叠按钮存在", () => {
     renderWithQueryClient(
-      <SidePanel selectedSymbol={null} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
     expect(
       screen.getByRole("button", { name: /折叠面板/i }),
@@ -148,7 +237,11 @@ describe("SidePanel — 折叠功能", () => {
 
   it("点击折叠 → aside 加 aside-collapsed class", () => {
     renderWithQueryClient(
-      <SidePanel selectedSymbol={null} onNodeSelect={vi.fn()} />,
+      <SidePanel
+        selectedSymbol={null}
+        onNodeSelect={vi.fn()}
+        chat={mockChat}
+      />,
     );
     const toggleBtn = screen.getByRole("button", { name: /折叠面板/i });
     fireEvent.click(toggleBtn);

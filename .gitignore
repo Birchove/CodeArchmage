@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+# R-5：E2E 测试用的假 .env（指向假 OpenAI 服务器，无真实 key）需要提交
+!web/tests/e2e/fixtures/sample_repo/.env
 *.pem
 *.key
 secrets/

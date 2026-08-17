@@ -11,10 +11,18 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4173",
   },
   webServer: [
+    {
+      // 循环 16：假 OpenAI SSE 服务器（E2E mock 供应商，不 mock 内部）
+      command: "python3 tests/e2e/fixtures/fake_openai.py --port 8767",
+      url: "http://127.0.0.1:8767",
+      timeout: 10_000,
+      reuseExistingServer: false,
+    },
     {
       // B-2：前置 rm -rf 保证从空态开始（在 webServer 启动前执行）
       command:
