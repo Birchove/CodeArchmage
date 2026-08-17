@@ -63,8 +63,8 @@ def create_app(
             allow_headers=["*"],
         )
 
-    from code_archmage.server.routes import router
     from code_archmage.server.llm_routes import llm_router
+    from code_archmage.server.routes import router
 
     app.include_router(router)
     app.include_router(llm_router)

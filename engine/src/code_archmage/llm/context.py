@@ -49,7 +49,6 @@ def build_context(
     file_path: str = row[3]
     line: int = row[4]
     end_line: int = row[5]
-    signature: str = row[6]
     bases: list[str] = json.loads(row[7])
 
     parts: list[str] = []
@@ -61,7 +60,9 @@ def build_context(
     if source:
         parts.append(f"<source_code>\n{source}\n</source_code>")
     else:
-        parts.append(f"<source_code>\n# （文件暂时无法读取：{file_path}）\n# 符号：{name}\n</source_code>")
+        parts.append(
+            f"<source_code>\n# （文件暂时无法读取：{file_path}）\n# 符号：{name}\n</source_code>"
+        )
 
     # --- 按 kind 组装额外上下文 ---
     if kind in ("function", "method"):
@@ -95,9 +96,7 @@ def _read_lines(repo_root: Path, file_path: str, line: int, end_line: int) -> st
     return "\n".join(lines[start:stop])
 
 
-def _append_callers(
-    conn: sqlite3.Connection, parts: list[str], callee_name: str
-) -> None:
+def _append_callers(conn: sqlite3.Connection, parts: list[str], callee_name: str) -> None:
     """追加直接 caller 列表。"""
     rows = conn.execute(
         "SELECT DISTINCT s.name, s.file_path, c.line "
@@ -112,9 +111,7 @@ def _append_callers(
     parts.append("<callers>\n" + "\n".join(lines) + "\n</callers>")
 
 
-def _append_callees(
-    conn: sqlite3.Connection, parts: list[str], caller_id: int
-) -> None:
+def _append_callees(conn: sqlite3.Connection, parts: list[str], caller_id: int) -> None:
     """追加直接 callee 列表（名称 + 签名）。"""
     rows = conn.execute(
         "SELECT DISTINCT c.callee_name, s.signature "

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Generator
-from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -124,7 +123,7 @@ class _FakeStream:
         # 模拟 httpx.Response 的 text 属性供错误提示
         self.text = content.decode(errors="replace")
 
-    def __enter__(self) -> "_FakeStream":
+    def __enter__(self) -> _FakeStream:
         return self
 
     def __exit__(self, *args: object) -> None:

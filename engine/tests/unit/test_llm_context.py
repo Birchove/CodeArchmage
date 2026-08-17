@@ -10,7 +10,6 @@ import pytest
 
 from code_archmage.llm.context import build_context
 
-
 # ---------------------------------------------------------------------------
 # Fixtures：内存 SQLite + 最小 schema
 # ---------------------------------------------------------------------------
@@ -54,7 +53,12 @@ def _insert_symbol(
         "INSERT INTO symbols(name, kind, file_path, line, col, end_line, signature, bases, decorators) "
         "VALUES (?,?,?,?,0,?,?,?,?)",
         (
-            name, kind, file_path, line, end_line, signature,
+            name,
+            kind,
+            file_path,
+            line,
+            end_line,
+            signature,
             json.dumps(bases or []),
             json.dumps(decorators or []),
         ),
@@ -93,31 +97,35 @@ class TestBuildContextFunction:
         py.parent.mkdir()
         py.write_text("def add(x, y):\n    return x + y\n")
         sid = _insert_symbol(
-            conn, name="add", kind="function",
-            file_path="src/a.py", line=1, end_line=2,
+            conn,
+            name="add",
+            kind="function",
+            file_path="src/a.py",
+            line=1,
+            end_line=2,
             signature="def add(x, y):",
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "add" in ctx
         assert "def add(x, y):" in ctx
 
-    def test_function_contains_source_code(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_function_contains_source_code(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("def add(x, y):\n    return x + y\n")
         sid = _insert_symbol(
-            conn, name="add", kind="function",
-            file_path="src/a.py", line=1, end_line=2,
+            conn,
+            name="add",
+            kind="function",
+            file_path="src/a.py",
+            line=1,
+            end_line=2,
             signature="def add(x, y):",
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "return x + y" in ctx
 
-    def test_function_contains_callers(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_function_contains_callers(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("def add(x, y):\n    return x + y\n\ndef main():\n    add(1, 2)\n")
@@ -131,37 +139,44 @@ class TestBuildContextFunction:
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "main" in ctx
 
-    def test_function_contains_callees(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_function_contains_callees(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
-        py.write_text(
-            "def helper(): pass\n"
-            "def add(x, y):\n"
-            "    return helper() + x + y\n"
-        )
+        py.write_text("def helper(): pass\ndef add(x, y):\n    return helper() + x + y\n")
         helper_id = _insert_symbol(
-            conn, name="helper", kind="function", file_path="src/a.py",
-            line=1, end_line=1, signature="def helper():"
+            conn,
+            name="helper",
+            kind="function",
+            file_path="src/a.py",
+            line=1,
+            end_line=1,
+            signature="def helper():",
         )
         sid = _insert_symbol(
-            conn, name="add", kind="function", file_path="src/a.py",
-            line=2, end_line=3, signature="def add(x, y):"
+            conn,
+            name="add",
+            kind="function",
+            file_path="src/a.py",
+            line=2,
+            end_line=3,
+            signature="def add(x, y):",
         )
         _insert_call(conn, caller_id=sid, callee_name="helper", callee_id=helper_id)
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "helper" in ctx
 
-    def test_function_uses_xml_tags(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_function_uses_xml_tags(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("def add(x, y):\n    return x + y\n")
         sid = _insert_symbol(
-            conn, name="add", kind="function", file_path="src/a.py",
-            line=1, end_line=2, signature="def add(x, y):"
+            conn,
+            name="add",
+            kind="function",
+            file_path="src/a.py",
+            line=1,
+            end_line=2,
+            signature="def add(x, y):",
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "<source_code>" in ctx
@@ -178,49 +193,54 @@ class TestBuildContextFunction:
 
 
 class TestBuildContextClass:
-    def test_class_contains_bases(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_class_contains_bases(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("class Dog(Animal):\n    def bark(self): pass\n")
         sid = _insert_symbol(
-            conn, name="Dog", kind="class", file_path="src/a.py",
-            line=1, end_line=2, bases=["Animal"]
+            conn,
+            name="Dog",
+            kind="class",
+            file_path="src/a.py",
+            line=1,
+            end_line=2,
+            bases=["Animal"],
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "Animal" in ctx
 
-    def test_class_contains_methods(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_class_contains_methods(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("class Dog(Animal):\n    def bark(self): pass\n")
-        _insert_symbol(
-            conn, name="Dog", kind="class", file_path="src/a.py",
-            line=1, end_line=2
-        )
+        _insert_symbol(conn, name="Dog", kind="class", file_path="src/a.py", line=1, end_line=2)
         sid = _insert_symbol(
-            conn, name="Dog", kind="class", file_path="src/a.py",
-            line=1, end_line=2, bases=["Animal"]
+            conn,
+            name="Dog",
+            kind="class",
+            file_path="src/a.py",
+            line=1,
+            end_line=2,
+            bases=["Animal"],
         )
         _insert_symbol(
-            conn, name="bark", kind="method", file_path="src/a.py",
-            line=2, end_line=2, signature="def bark(self):"
+            conn,
+            name="bark",
+            kind="method",
+            file_path="src/a.py",
+            line=2,
+            end_line=2,
+            signature="def bark(self):",
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "bark" in ctx
 
-    def test_class_source_code(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_class_source_code(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("class Dog(Animal):\n    def bark(self): pass\n")
         sid = _insert_symbol(
-            conn, name="Dog", kind="class", file_path="src/a.py",
-            line=1, end_line=2
+            conn, name="Dog", kind="class", file_path="src/a.py", line=1, end_line=2
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "class Dog" in ctx
@@ -231,23 +251,27 @@ class TestBuildContextClass:
         """同文件顶层函数不应被误列为类成员（C-5 回归测试）。"""
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
-        py.write_text(
-            "class Dog:\n"
-            "    def bark(self): pass\n"
-            "\n"
-            "def standalone(): pass\n"
-        )
+        py.write_text("class Dog:\n    def bark(self): pass\n\ndef standalone(): pass\n")
         class_id = _insert_symbol(
-            conn, name="Dog", kind="class", file_path="src/a.py",
-            line=1, end_line=2
+            conn, name="Dog", kind="class", file_path="src/a.py", line=1, end_line=2
         )
         _insert_symbol(
-            conn, name="bark", kind="method", file_path="src/a.py",
-            line=2, end_line=2, signature="def bark(self):"
+            conn,
+            name="bark",
+            kind="method",
+            file_path="src/a.py",
+            line=2,
+            end_line=2,
+            signature="def bark(self):",
         )
         _insert_symbol(
-            conn, name="standalone", kind="function", file_path="src/a.py",
-            line=4, end_line=4, signature="def standalone():"
+            conn,
+            name="standalone",
+            kind="function",
+            file_path="src/a.py",
+            line=4,
+            end_line=4,
+            signature="def standalone():",
         )
         ctx = build_context(conn, class_id, repo_root=tmp_path)
         # bark 是类成员，应出现
@@ -261,15 +285,12 @@ class TestBuildContextClass:
 
 
 class TestBuildContextVariable:
-    def test_variable_contains_source_line(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_variable_contains_source_line(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("MAX_RETRIES = 3\n")
         sid = _insert_symbol(
-            conn, name="MAX_RETRIES", kind="variable",
-            file_path="src/a.py", line=1, end_line=1
+            conn, name="MAX_RETRIES", kind="variable", file_path="src/a.py", line=1, end_line=1
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "MAX_RETRIES" in ctx
@@ -297,22 +318,18 @@ class TestBuildContextEdgeCases:
     ) -> None:
         """符号记录存在但文件已删除 → 占位提示，不崩溃。"""
         sid = _insert_symbol(
-            conn, name="missing_func", kind="function",
-            file_path="src/gone.py", line=1, end_line=5
+            conn, name="missing_func", kind="function", file_path="src/gone.py", line=1, end_line=5
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert ctx != ""  # 有占位内容
         assert "missing_func" in ctx  # 至少包含符号名
 
-    def test_no_callers_still_works(
-        self, conn: sqlite3.Connection, tmp_path: Path
-    ) -> None:
+    def test_no_callers_still_works(self, conn: sqlite3.Connection, tmp_path: Path) -> None:
         py = tmp_path / "src" / "a.py"
         py.parent.mkdir()
         py.write_text("def orphan(): pass\n")
         sid = _insert_symbol(
-            conn, name="orphan", kind="function",
-            file_path="src/a.py", line=1, end_line=1
+            conn, name="orphan", kind="function", file_path="src/a.py", line=1, end_line=1
         )
         ctx = build_context(conn, sid, repo_root=tmp_path)
         assert "orphan" in ctx

@@ -102,9 +102,7 @@ def _client(config: LLMConfig) -> httpx.Client:
 def _raise_for_status(resp: httpx.Response) -> None:
     """HTTP 非 2xx → 抛 GatewayError。"""
     if resp.status_code >= 400:
-        raise GatewayError(
-            f"LLM 服务返回错误 {resp.status_code}：{resp.text[:200]}"
-        )
+        raise GatewayError(f"LLM 服务返回错误 {resp.status_code}：{resp.text[:200]}")
 
 
 def _parse_sse_line(line: str) -> str:
@@ -118,7 +116,7 @@ def _parse_sse_line(line: str) -> str:
     """
     if not line.startswith("data: "):
         return ""
-    payload = line[len("data: "):]
+    payload = line[len("data: ") :]
     if payload.strip() == "[DONE]":
         return ""
     try:

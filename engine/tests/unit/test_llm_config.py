@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from code_archmage.llm.config import LLMConfig, load_config
+from code_archmage.llm.config import load_config
 
 
 class TestLoadConfig:
@@ -28,8 +28,7 @@ class TestLoadConfig:
     def test_missing_key_returns_none(self, tmp_path: Path) -> None:
         env = tmp_path / ".env"
         env.write_text(
-            "LLM_BASE_URL=https://api.deepseek.com/v1\n"
-            "LLM_MODEL=deepseek-chat\n"
+            "LLM_BASE_URL=https://api.deepseek.com/v1\nLLM_MODEL=deepseek-chat\n"
             # LLM_API_KEY 缺失
         )
         assert load_config(env) is None
@@ -85,7 +84,9 @@ class TestLoadConfig:
         with pytest.raises((AttributeError, TypeError)):
             cfg.api_key = "changed"  # type: ignore[misc]
 
-    def test_none_env_path_with_no_cwd_env_returns_none(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_none_env_path_with_no_cwd_env_returns_none(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """传 None 时不依赖 cwd，若无默认 .env 则返回 None。"""
         monkeypatch.chdir(tmp_path)  # 空目录，无 .env
         result = load_config(None)

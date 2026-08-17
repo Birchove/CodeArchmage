@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from code_archmage.llm.config import LLMConfig
-from code_archmage.llm.summaries import SummaryResult, get_or_create
+from code_archmage.llm.summaries import get_or_create
 
 _CFG = LLMConfig(api_key="sk-test", base_url="https://x.com/v1", model="m1")
 
@@ -91,9 +88,7 @@ class TestGetOrCreate:
         assert row is not None
         assert row[0] == "这是 foo 函数的摘要。"
 
-    def test_cache_miss_does_not_call_llm_again_on_second_call(
-        self, tmp_path: Path
-    ) -> None:
+    def test_cache_miss_does_not_call_llm_again_on_second_call(self, tmp_path: Path) -> None:
         conn = _make_conn()
         (tmp_path / "src").mkdir()
         (tmp_path / "src" / "a.py").write_text("def foo(): pass\n")
@@ -117,7 +112,5 @@ class TestGetOrCreate:
             result = get_or_create(conn, sid, _CFG, repo_root=tmp_path)
 
         assert result.model == "m1"
-        row = conn.execute(
-            "SELECT model FROM summaries WHERE symbol_id = ?", (sid,)
-        ).fetchone()
+        row = conn.execute("SELECT model FROM summaries WHERE symbol_id = ?", (sid,)).fetchone()
         assert row[0] == "m1"
