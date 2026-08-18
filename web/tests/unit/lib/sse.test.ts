@@ -52,6 +52,16 @@ describe("parseSSELine", () => {
     })}`;
     expect(parseSSELine(line)).toBeUndefined();
   });
+
+  it("parses guide-stream content field（Stage 7b：/api/guides/generate）", () => {
+    const line = `data: ${JSON.stringify({ content: "讲解片段" })}`;
+    expect(parseSSELine(line)).toEqual({ delta: "讲解片段" });
+  });
+
+  it("skips guide-stream empty content", () => {
+    const line = `data: ${JSON.stringify({ content: "" })}`;
+    expect(parseSSELine(line)).toBeUndefined();
+  });
 });
 
 describe("parseSSEStream", () => {

@@ -888,3 +888,368 @@ body {
   font-family: var(--mono);
   font-size: 12px;
 }
+
+/* === 多候选跳转浮层（Stage 7a A-1）=== */
+.candidate-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.candidate-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-width: 560px;
+  width: calc(100vw - 48px);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.candidate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.candidate-title {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.candidate-close {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.candidate-hint {
+  font-size: 13px;
+  color: var(--text);
+  margin: 8px 0 12px;
+}
+
+.candidate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidate-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--code-bg);
+  cursor: pointer;
+  font: inherit;
+}
+
+.candidate-item:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+
+.candidate-name {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.candidate-loc {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.candidate-signature {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* === 导读视图（Stage 7b）=== */
+.guide-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.guide-tree {
+  width: 260px;
+  min-width: 260px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.guide-tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guide-tree-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.guide-tree-item:hover {
+  background: var(--code-bg);
+}
+
+.guide-tree-item.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+
+.guide-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-status {
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.guide-status-cached {
+  color: #15803d;
+}
+
+.guide-status-stale {
+  color: #b45309;
+}
+
+.guide-status-none {
+  color: var(--text);
+  opacity: 0.6;
+}
+
+.guide-tree-empty {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.guide-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.guide-body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.guide-body-empty {
+  align-items: flex-start;
+  padding-top: 48px;
+}
+
+.guide-text-block {
+  color: var(--text-h);
+  line-height: 1.7;
+}
+
+.guide-text-block h2,
+.guide-text-block h3 {
+  margin: 20px 0 8px;
+  color: var(--text-h);
+}
+
+.guide-text-block p {
+  margin: 8px 0;
+}
+
+.guide-text-block pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.guide-text-block code {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.guide-code-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--code-bg);
+}
+
+.guide-code-loc {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.guide-code-loc:hover {
+  background: var(--accent-bg);
+}
+
+.guide-code-view {
+  font-size: 13px;
+}
+
+.guide-code-view .cm-editor {
+  background: var(--code-bg);
+}
+
+.guide-code-loading,
+.guide-code-error,
+.guide-code-note {
+  margin: 0;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.guide-code-error {
+  color: #dc2626;
+}
+
+.guide-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid #b45309;
+  border-radius: 6px;
+  background: rgba(180, 83, 9, 0.1);
+  font-size: 13px;
+}
+
+.guide-regenerate-btn {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.guide-generating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.guide-error {
+  color: #dc2626;
+  font-size: 13px;
+}
+
+/* === 阅读/导读模式切换（Stage 7b）=== */
+.mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mode-btn {
+  padding: 4px 12px;
+  border: none;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.mode-btn:not(.active):hover {
+  background: var(--code-bg);
+}
+
+/* 阅读模式右下角：当前文件的导读入口（Stage 7b） */
+.read-guide-entry {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 6px 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.read-guide-entry:hover {
+  background: var(--accent-bg);
+}
+
+/* 导读模式：app-body 切为单列，导读页占满整行（避免被三列网格塞进第一列） */
+.app-body-guide {
+  grid-template-columns: 1fr;
+}
+
+.app-body-guide .guide-page {
+  grid-column: 1 / -1;
+  height: 100%;
+  min-height: 0;
+}

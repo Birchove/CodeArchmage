@@ -21,7 +21,7 @@ class TestInitDb:
         conn.close()
 
     def test_all_tables_exist(self) -> None:
-        """7 张业务表全部存在（FTS5 影子表和 sqlite_sequence 是内部表，用子集检查）。"""
+        """8 张业务表全部存在（FTS5 影子表和 sqlite_sequence 是内部表，用子集检查）。"""
         conn = init_db(":memory:")
         rows = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
@@ -29,7 +29,16 @@ class TestInitDb:
         table_names = {r[0] for r in rows}
         conn.close()
 
-        expected = {"meta", "files", "symbols", "calls", "imports", "summaries", "symbols_fts"}
+        expected = {
+            "meta",
+            "files",
+            "symbols",
+            "calls",
+            "imports",
+            "summaries",
+            "symbols_fts",
+            "guides",  # Stage 7b：导读缓存
+        }
         # 子集检查：FTS5 会自动创建 symbols_fts_data/_config/_idx/_docsize 等影子表
         assert expected <= table_names, f"缺少表: {expected - table_names}"
 
@@ -66,13 +75,13 @@ class TestInitDb:
         assert trigger_names == expected, f"缺少触发器: {expected - trigger_names}"
 
     def test_meta_schema_version(self) -> None:
-        """meta 表写入 schema_version='1'。"""
+        """meta 表写入 schema_version='2'（Stage 7b：guides 表）。"""
         conn = init_db(":memory:")
         row = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
         conn.close()
 
         assert row is not None
-        assert row[0] == "1"
+        assert row[0] == "2"
 
     def test_wal_mode_on_file_db(self, tmp_path: object) -> None:
         """文件数据库启用 WAL 模式（:memory: 下 WAL 不适用，故单独测文件库）。"""

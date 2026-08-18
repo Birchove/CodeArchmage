@@ -61,6 +61,10 @@ export interface IndexResultOut {
   symbols_total: number;
   calls_total: number;
   duration_ms: number;
+  /** Stage 7a A-5：本次重新解析写入的文件数（新文件 + hash 变化）。 */
+  files_updated: number;
+  /** Stage 7a A-5：hash 未变跳过的文件数。 */
+  files_skipped: number;
 }
 
 export interface IndexStatusOut {
@@ -96,4 +100,42 @@ export interface SummaryResponse {
   summary_text: string;
   model: string;
   cached: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 7b：导读（Guides）类型
+// ---------------------------------------------------------------------------
+
+export type GuideScope = "project" | "module" | "file";
+export type GuideStatus = "none" | "cached" | "stale";
+
+export interface GuideEntryOut {
+  scope: GuideScope;
+  /** 项目导读为 ""。 */
+  path: string;
+  status: GuideStatus;
+}
+
+export interface GuideTreeOut {
+  project: GuideEntryOut;
+  modules: GuideEntryOut[];
+  files: GuideEntryOut[];
+}
+
+export interface GuideBlockOut {
+  type: "text" | "code";
+  text?: string | null;
+  file_path?: string | null;
+  start_line?: number | null;
+  end_line?: number | null;
+  note?: string | null;
+}
+
+export interface GuideOut {
+  scope: GuideScope;
+  path: string;
+  content_md: string;
+  blocks: GuideBlockOut[];
+  stale: boolean;
+  model: string;
 }

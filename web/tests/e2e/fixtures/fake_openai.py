@@ -27,8 +27,21 @@ class FakeOpenAIHandler(BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        # 读取请求体（不验证内容，E2E 只关心流式回传）
-        _ = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        # 读取请求体（E2E 按内容决定回什么）
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+
+        # Stage 7b：导读 prompt（含「导读作者」标记）→ 返回带 code 围栏的固定导读，
+        # 让 E2E 能确定性验证代码块渲染与跳回定位。
+        is_guide = "导读作者".encode("utf-8") in body
+        if is_guide:
+            chunks = [
+                "## E2E 测试导读\n\n这是假导读的讲解段落。\n\n",
+                "```code file=operations.py lines=4-6\n```\n\n",
+                "讲解收尾。",
+            ]
+        else:
+            # 对话场景：模拟流式分片
+            chunks = ["这是", "一个", "测试", "函数", "。", "它", "什么", "也不做", "。"]
 
         # SSE 响应头（S-4：三响应头防缓冲）
         self.send_response(200)
@@ -37,8 +50,6 @@ class FakeOpenAIHandler(BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
-        # 模拟流式分片
-        chunks = ["这是", "一个", "测试", "函数", "。", "它", "什么", "也不做", "。"]
         for chunk in chunks:
             data = {
                 "choices": [

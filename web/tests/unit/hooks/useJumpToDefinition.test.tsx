@@ -137,7 +137,47 @@ describe("useJumpToDefinition — B-2 跳定义交互测试", () => {
     await waitFor(() => expect(onOpenFile).toHaveBeenCalledWith("bar.py", 3));
   });
 
-  it("jump-by-name：多候选 → 不跳转（留阶段 5）", async () => {
+  it("jump-by-name：多候选 → 不跳转 + 回调 onCandidates（A-1）", async () => {
+    server.use(
+      http.get("*/api/symbols", ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get("name") === "dup") {
+          return HttpResponse.json([
+            makeSymbol({ id: 1, name: "dup", file_path: "a.py", line: 1 }),
+            makeSymbol({ id: 2, name: "dup", file_path: "b.py", line: 2 }),
+          ]);
+        }
+        return HttpResponse.json([]);
+      }),
+    );
+    const onOpenFile = vi.fn();
+    const onCandidates = vi.fn();
+    const { result } = renderHook(
+      () =>
+        useJumpToDefinition(
+          "current.py",
+          {
+            onOpenFile,
+            onSameFileScroll: vi.fn(),
+          },
+          { onCandidates },
+        ),
+      { wrapper: createQueryClientWrapper() },
+    );
+
+    await result.current.jumpFromCall(
+      call({ callee_id: null, callee_name: "dup" }),
+    );
+
+    await waitFor(() => expect(onCandidates).toHaveBeenCalledTimes(1));
+    // 候选列表是后端返回的全部定义
+    expect(onCandidates.mock.calls[0][0]).toHaveLength(2);
+    expect(onCandidates.mock.calls[0][0][1].file_path).toBe("b.py");
+    // 不自动跳转
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+
+  it("jump-by-name：多候选但未提供 onCandidates → 保持静默不跳转（A-1 兼容）", async () => {
     server.use(
       http.get("*/api/symbols", ({ request }) => {
         const url = new URL(request.url);

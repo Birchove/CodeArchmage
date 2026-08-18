@@ -30,6 +30,8 @@ describe("useTriggerIndex — S-4 状态机", () => {
           symbols_total: 10,
           calls_total: 5,
           duration_ms: 42,
+          files_updated: 3,
+          files_skipped: 0,
         }),
       ),
     );
@@ -55,6 +57,8 @@ describe("useTriggerIndex — S-4 状态机", () => {
           symbols_total: 1,
           calls_total: 0,
           duration_ms: 1,
+          files_updated: 1,
+          files_skipped: 0,
         }),
       ),
     );
@@ -94,6 +98,8 @@ describe("useTriggerIndex — S-4 状态机", () => {
           symbols_total: 1,
           calls_total: 0,
           duration_ms: 1,
+          files_updated: 1,
+          files_skipped: 0,
         });
       }),
     );

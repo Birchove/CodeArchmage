@@ -82,6 +82,10 @@ export function parseSSELine(line: string): SSEDelta | undefined | null {
   if (typeof d["delta"] === "string") {
     return d["delta"] ? { delta: d["delta"] } : undefined;
   }
+  // Stage 7b：导读生成流用 content 字段（/api/guides/generate）
+  if (typeof d["content"] === "string") {
+    return d["content"] ? { delta: d["content"] } : undefined;
+  }
 
   // 兼容 OpenAI 原始格式（透传场景）
   const choices = d["choices"];

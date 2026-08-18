@@ -37,6 +37,24 @@ class TestTriggerIndex:
         assert data["duration_ms"] >= 0
         # cc B-1: files_changed 已移除（原恒等于 files_total，语义误导）
         assert "files_changed" not in data
+        # Stage 7a A-5：索引统计（首次全量 → 全部重新索引）
+        assert data["files_updated"] == 2
+        assert data["files_skipped"] == 0
+
+    def test_reindex_reports_skipped(self, tmp_path: Path) -> None:
+        """Stage 7a A-5：二次索引（无改动）→ skipped=全部。"""
+        (tmp_path / "a.py").write_bytes(b"def foo():\n    pass\n")
+        (tmp_path / "b.py").write_bytes(b"def bar():\n    pass\n")
+
+        app = create_app(tmp_path)
+        client = TestClient(app)
+        client.post("/api/index")
+        resp = client.post("/api/index")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["files_updated"] == 0
+        assert data["files_skipped"] == 2
 
     def test_index_empty_repo(self, tmp_path: Path) -> None:
         """空仓库（无 .py）→ 200 全零。"""
@@ -79,7 +97,7 @@ class TestIndexStatus:
         data = resp.json()
         assert data["file_count"] == 1
         assert data["symbol_count"] == 1
-        assert data["schema_version"] == "1"
+        assert data["schema_version"] == "2"
         assert data["repo_root"] == str(app.state.repo_root)
 
     def test_status_empty_db(self, tmp_path: Path) -> None:

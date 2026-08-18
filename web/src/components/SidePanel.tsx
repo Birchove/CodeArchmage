@@ -6,8 +6,9 @@
  * 和 useCallChain 每次切回全量重跑。
  * 面板可折叠：收起后只留右侧窄条和展开按钮（不能把整栏 visibility:hidden）。
  *
- * Stage 6 S-1：对话标签页的 chat 状态由 App 层管理（切换符号 = 开新对话）。
+ * Stage 6 S-1：对话标签页的 chat 状态由 App 层管理。
  * Stage 6：对话标签激活时 aside 加 aside-chat class（自身加宽到 400px）。
+ * Stage 7a A-2：对话按符号保留，切换标签/符号不再中断流式（用户可点「停止」）。
  */
 import { type JSX, useState } from "react";
 import { CallGraph } from "@/components/CallGraph";
@@ -59,11 +60,9 @@ export function SidePanel({
   const callers = useCallers(selectedSymbol?.id ?? null);
   const callees = useCallees(selectedSymbol?.id ?? null);
 
-  // R-2：切换标签时 abort 流式对话（离开 chat 标签时）
+  // Stage 7a A-2：切换标签/符号不再中断流式——会话按符号保留，
+  // 后台继续写入原会话；用户可随时点「停止」显式中止。
   const handleTabChange = (tab: Tab) => {
-    if (activeTab === "chat" && tab !== "chat") {
-      chat.onAbort();
-    }
     setActiveTab(tab);
   };
 

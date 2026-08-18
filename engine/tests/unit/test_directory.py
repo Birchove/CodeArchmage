@@ -6,6 +6,7 @@
 - 修改文件后先删后写（旧符号消失、新符号出现）
 - 删除文件后孤儿数据清理
 - 路径规范化
+- 索引统计（Stage 7a A-5：indexed / skipped 计数）
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import pytest
 
 from code_archmage.indexer.resolver import assign_callers, resolve_callees
 from code_archmage.indexer.schema import init_db
-from code_archmage.indexer.writer import index_directory
+from code_archmage.indexer.writer import IndexStats, index_directory
 
 
 class TestIndexDirectory:
@@ -231,3 +232,60 @@ class TestSymlinkNotIndexed:
 
         assert "real.py" in names
         assert "link.py" not in names
+
+
+class TestIndexStats:
+    """Stage 7a A-5：index_directory 返回索引统计（indexed / skipped）。"""
+
+    def test_fresh_index_counts_all_files(self, tmp_path: Path) -> None:
+        """首次全量索引 → indexed=文件数，skipped=0。"""
+        (tmp_path / "a.py").write_bytes(b"def foo():\n    pass\n")
+        (tmp_path / "b.py").write_bytes(b"def bar():\n    pass\n")
+
+        conn = init_db(":memory:")
+        stats = index_directory(conn, tmp_path)
+        conn.close()
+
+        assert stats == IndexStats(files_indexed=2, files_skipped=0)
+
+    def test_incremental_counts_skipped(self, tmp_path: Path) -> None:
+        """二次索引（无改动）→ skipped=全部，indexed=0。"""
+        (tmp_path / "a.py").write_bytes(b"def foo():\n    pass\n")
+        (tmp_path / "b.py").write_bytes(b"def bar():\n    pass\n")
+
+        conn = init_db(":memory:")
+        index_directory(conn, tmp_path)
+
+        stats = index_directory(conn, tmp_path)
+        conn.close()
+
+        assert stats == IndexStats(files_indexed=0, files_skipped=2)
+
+    def test_mixed_new_changed_skipped(self, tmp_path: Path) -> None:
+        """新增 1 + 修改 1 + 不变 1 → indexed=2，skipped=1。"""
+        (tmp_path / "keep.py").write_bytes(b"def keep():\n    pass\n")
+        (tmp_path / "change.py").write_bytes(b"def old():\n    pass\n")
+
+        conn = init_db(":memory:")
+        index_directory(conn, tmp_path)
+
+        (tmp_path / "change.py").write_bytes(b"def new():\n    pass\n")
+        (tmp_path / "added.py").write_bytes(b"def added():\n    pass\n")
+        stats = index_directory(conn, tmp_path)
+        conn.close()
+
+        assert stats == IndexStats(files_indexed=2, files_skipped=1)
+
+    def test_orphan_cleanup_not_counted(self, tmp_path: Path) -> None:
+        """删除文件不影响计数（孤儿清理不算索引）。"""
+        (tmp_path / "keep.py").write_bytes(b"def keep():\n    pass\n")
+        (tmp_path / "gone.py").write_bytes(b"def gone():\n    pass\n")
+
+        conn = init_db(":memory:")
+        index_directory(conn, tmp_path)
+
+        (tmp_path / "gone.py").unlink()
+        stats = index_directory(conn, tmp_path)
+        conn.close()
+
+        assert stats == IndexStats(files_indexed=0, files_skipped=1)

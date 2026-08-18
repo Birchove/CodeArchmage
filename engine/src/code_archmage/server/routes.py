@@ -64,7 +64,7 @@ def _do_index(repo_root: Path, db_path: Path) -> IndexResultOut:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
-        index_directory(conn, repo_root)
+        stats = index_directory(conn, repo_root)
         assign_callers(conn)
         resolve_callees(conn)
         files_total = conn.execute("SELECT count(*) FROM files").fetchone()[0]
@@ -78,6 +78,8 @@ def _do_index(repo_root: Path, db_path: Path) -> IndexResultOut:
         symbols_total=symbols_total,
         calls_total=calls_total,
         duration_ms=duration_ms,
+        files_updated=stats.files_indexed,
+        files_skipped=stats.files_skipped,
     )
 
 

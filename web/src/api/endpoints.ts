@@ -6,6 +6,8 @@ import { apiGet, apiPost } from "./client";
 import type {
   FileContentOut,
   FileTreeOut,
+  GuideOut,
+  GuideTreeOut,
   IndexResultOut,
   IndexStatusOut,
   SearchHitOut,
@@ -77,6 +79,35 @@ export const fetchChat = (
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, symbol_id: symbolId, history }),
+    signal: signal ?? undefined,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Stage 7b：导读端点
+// ---------------------------------------------------------------------------
+
+/** 导读目录（确定性，不花 token）。 */
+export const getGuideTree = (): Promise<GuideTreeOut> =>
+  apiGet<GuideTreeOut>("/guides/tree");
+
+/** 读一篇导读缓存（未生成 → 404）。 */
+export const getGuide = (scope: string, path: string): Promise<GuideOut> =>
+  apiGet<GuideOut>(
+    `/guides?scope=${encodeURIComponent(scope)}&path=${encodeURIComponent(path)}`,
+  );
+
+/** 获取 /api/guides/generate 的 SSE Response（调用方解析流）。 */
+export const fetchGuideGenerate = (
+  scope: string,
+  path: string,
+  signal?: AbortSignal | null,
+): Promise<Response> => {
+  const BASE = "/api";
+  return fetch(`${BASE}/guides/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, path }),
     signal: signal ?? undefined,
   });
 };

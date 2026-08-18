@@ -46,6 +46,34 @@ test.describe("Code Archmage 全链路", () => {
     await expect(page.getByText("Calculator").first()).toBeVisible();
   });
 
+  test("A-1：点击同名调用点 → 候选浮层 → 选择跳转", async ({ page }) => {
+    await page.goto("/");
+    if (await page.getByText(/尚未索引|无 Python/i).isVisible()) {
+      await page.getByRole("button", { name: /索引/i }).first().click();
+      await expect(page.getByText("main.py")).toBeVisible({ timeout: 15_000 });
+    }
+
+    // 打开 utils.py（format_result 内调用 load()，全库有两个同名定义）
+    await page.getByText("utils.py").click();
+    await expect(page.locator(".cm-content")).toContainText(
+      "def format_result",
+    );
+
+    // 点击调用点标记 → 弹出候选浮层（不再静默失败）
+    await page.locator(".cm-call-mark").first().click();
+    const dialog = page.locator(".candidate-dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("2 个同名定义");
+    await expect(dialog).toContainText("operations.py");
+
+    // 选择 operations.py 的候选 → 跳到该文件
+    await dialog
+      .locator(".candidate-item", { hasText: "operations.py" })
+      .click();
+    await expect(page.locator(".cm-content")).toContainText("def load");
+    await expect(dialog).not.toBeVisible();
+  });
+
   test("B-5：openapi 契约断言（关键模型存在）", async ({ request }) => {
     // FastAPI 的 openapi.json 在根路径（非 /api 前缀），直接请求后端
     const resp = await request.get("http://127.0.0.1:8766/openapi.json");

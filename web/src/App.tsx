@@ -10,11 +10,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FileTree } from "@/components/FileTree";
 import { CodeView, type CodeViewHandle } from "@/components/CodeView";
 import { SymbolOutline } from "@/components/SymbolOutline";
-import { Header } from "@/components/Header";
+import { Header, type AppMode } from "@/components/Header";
 import { SidePanel } from "@/components/SidePanel";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { Spinner } from "@/components/Spinner";
+import { CandidatePicker } from "@/components/CandidatePicker";
+import { GuidePage } from "@/components/GuidePage";
 import { useFileTree } from "@/hooks/useFileTree";
 import { useFileContent } from "@/hooks/useFileContent";
 import { useIndexStatus } from "@/hooks/useIndexStatus";
@@ -23,6 +25,7 @@ import { useHealth } from "@/hooks/useHealth";
 import { useJumpToDefinition } from "@/hooks/useJumpToDefinition";
 import { useChat } from "@/hooks/useChat";
 import { useLLMConfig } from "@/hooks/useLLMConfig";
+import { useGuide } from "@/hooks/useGuide";
 import { buildTree } from "@/lib/tree";
 import { ApiError } from "@/api/client";
 import { getSymbolById } from "@/api/endpoints";
@@ -51,6 +54,12 @@ function AppInner(): JSX.Element {
   const codeViewRef = useRef<CodeViewHandle>(null);
   // 跳定义后等待文件加载再滚动到目标行
   const pendingScrollRef = useRef<number | null>(null);
+  // Stage 7b：阅读 / 导读模式
+  const [mode, setMode] = useState<AppMode>("read");
+  // 待滚动信号的变化计数（同文件跳转也要触发 effect）
+  const [scrollTick, setScrollTick] = useState(0);
+  // 「查看导读」进入导读模式时的聚焦文件
+  const [guideFocus, setGuideFocus] = useState<string | null>(null);
 
   const health = useHealth();
   const indexStatus = useIndexStatus();
@@ -59,16 +68,12 @@ function AppInner(): JSX.Element {
   const triggerIndex = useTriggerIndex();
   const llmConfig = useLLMConfig();
 
-  // Stage 6：对话状态提升到 App 层（S-1：切换符号 = 开新对话）
-  const chat = useChat();
-  const [chatDraft, setChatDraft] = useState("");
+  // Stage 7b：当前文件的导读（用于阅读模式的「查看导读」入口）
+  const fileGuide = useGuide("file", selectedFile ?? "");
 
-  // S-1：切换符号时清空对话 + 草稿（开新对话）
-  useEffect(() => {
-    chat.clear();
-    setChatDraft("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSymbol?.id]);
+  // Stage 6：对话状态提升到 App 层（Stage 7a A-2：按符号保留对话，切换不丢历史）
+  const chat = useChat(selectedSymbol?.id ?? null);
+  const [chatDraft, setChatDraft] = useState("");
 
   // 草稿保活：切换标签不丢失（draft 存 state，由 ChatPanel 受控）
   const handleDraftChange = useCallback((text: string) => {
@@ -79,12 +84,12 @@ function AppInner(): JSX.Element {
     const text = chatDraft;
     if (!text.trim()) return;
     setChatDraft("");
-    chat.send(text, selectedSymbol?.id ?? null);
-  }, [chat, chatDraft, selectedSymbol?.id]);
+    chat.send(text);
+  }, [chat, chatDraft]);
 
   const handleRetry = useCallback(() => {
-    chat.retry(selectedSymbol?.id ?? null);
-  }, [chat, selectedSymbol?.id]);
+    chat.retry();
+  }, [chat]);
 
   // 统一选中符号回调（阶段 5 §2.5）：设置 selectedSymbol + 打开文件/滚动
   const selectSymbol = useCallback(
@@ -120,22 +125,39 @@ function AppInner(): JSX.Element {
     }
   }, [triggerIndex.isSuccess]);
 
-  // 跳定义 hook（B-2：从内联逻辑提取，使可测试）
-  const { jumpFromPosition } = useJumpToDefinition(selectedFile, {
-    onOpenFile: (filePath, line) => {
-      setSelectedFile(filePath);
-      pendingScrollRef.current = line;
-    },
-    onSameFileScroll: (line) => codeViewRef.current?.scrollToLine(line),
-  });
+  // Stage 7a A-1：多候选跳转浮层
+  const [jumpCandidates, setJumpCandidates] = useState<SymbolOut[] | null>(
+    null,
+  );
 
-  // 文件加载完成后执行待处理的滚动（跳定义）
+  // 跳定义 hook（B-2：从内联逻辑提取，使可测试）
+  const { jumpFromPosition } = useJumpToDefinition(
+    selectedFile,
+    {
+      onOpenFile: (filePath, line) => {
+        setSelectedFile(filePath);
+        pendingScrollRef.current = line;
+      },
+      onSameFileScroll: (line) => codeViewRef.current?.scrollToLine(line),
+    },
+    { onCandidates: (cands) => setJumpCandidates(cands) },
+  );
+
+  // Stage 7b：导读代码块点击 → 跳回阅读模式并定位
+  const handleJumpToSource = useCallback((filePath: string, line: number) => {
+    setMode("read");
+    setSelectedFile(filePath);
+    pendingScrollRef.current = line;
+    setScrollTick((t) => t + 1);
+  }, []);
+
+  // 文件加载完成后执行待处理的滚动（跳定义 / 导读跳转）
   useEffect(() => {
     if (fileContent.data && pendingScrollRef.current !== null) {
       codeViewRef.current?.scrollToLine(pendingScrollRef.current);
       pendingScrollRef.current = null;
     }
-  }, [fileContent.data]);
+  }, [fileContent.data, scrollTick]);
 
   // 后端不可用（O-2）
   if (health.isError) {
@@ -163,72 +185,111 @@ function AppInner(): JSX.Element {
             ? "索引正在进行中"
             : null
         }
+        lastIndex={triggerIndex.data ?? null}
         onTriggerIndex={() => triggerIndex.mutate()}
         isSearchEnabled={isIndexed}
         onSearchSelect={handleSearchSelect}
+        mode={mode}
+        onModeChange={setMode}
       />
-      <div className="app-body">
-        <aside className="app-sidebar">
-          <section className="sidebar-section file-tree-section">
-            <h2 className="sidebar-title">文件</h2>
-            <FileTree
-              nodes={buildTree(fileTree.data?.paths ?? [])}
-              onSelect={setSelectedFile}
+      <div
+        className={mode === "guide" ? "app-body app-body-guide" : "app-body"}
+      >
+        {mode === "guide" ? (
+          // Stage 7b：导读整页视图（notebook × DeepWiki 的"引导层"）
+          <GuidePage
+            onJumpToSource={handleJumpToSource}
+            initialSelection={
+              guideFocus ? { scope: "file", path: guideFocus } : undefined
+            }
+          />
+        ) : (
+          <>
+            <aside className="app-sidebar">
+              <section className="sidebar-section file-tree-section">
+                <h2 className="sidebar-title">文件</h2>
+                <FileTree
+                  nodes={buildTree(fileTree.data?.paths ?? [])}
+                  onSelect={setSelectedFile}
+                />
+              </section>
+              <section className="sidebar-section outline-section">
+                <h2 className="sidebar-title">符号</h2>
+                <SymbolOutline
+                  symbols={fileContent.data?.symbols ?? []}
+                  onSelect={selectSymbol}
+                />
+              </section>
+            </aside>
+            <main className="app-main">
+              {triggerIndex.isPending ? (
+                <div className="app-loading">
+                  <Spinner />
+                  <p>正在索引…</p>
+                </div>
+              ) : !hasFiles && !isIndexed ? (
+                <EmptyState onTriggerIndex={() => triggerIndex.mutate()} />
+              ) : fileContent.isLoading ? (
+                <div className="app-loading">
+                  <Spinner />
+                  <p>加载文件…</p>
+                </div>
+              ) : selectedFile && fileContent.data ? (
+                <CodeView
+                  ref={codeViewRef}
+                  content={fileContent.data.content}
+                  calls={fileContent.data.calls}
+                  onSymbolClick={(line, col) =>
+                    jumpFromPosition(fileContent.data.calls, line, col)
+                  }
+                />
+              ) : (
+                <p className="app-placeholder">选择一个文件开始阅读</p>
+              )}
+              {/* Stage 7b：当前文件已有导读 → 一键进入该文件的导读 */}
+              {mode === "read" && selectedFile && fileGuide.guide && (
+                <button
+                  type="button"
+                  className="read-guide-entry"
+                  onClick={() => {
+                    setGuideFocus(selectedFile);
+                    setMode("guide");
+                  }}
+                >
+                  📖 查看导读
+                </button>
+              )}
+            </main>
+            <SidePanel
+              selectedSymbol={selectedSymbol}
+              onNodeSelect={selectSymbol}
+              chat={{
+                messages: chat.messages,
+                isStreaming: chat.isStreaming,
+                error: chat.error,
+                draft: chatDraft,
+                llmConfigured: llmConfig.data?.configured ?? false,
+                configMessage: llmConfig.data?.message ?? null,
+                configLoading: llmConfig.isPending,
+                onDraftChange: handleDraftChange,
+                onSend: handleSend,
+                onRetry: handleRetry,
+                onClear: chat.clear,
+                onAbort: chat.abort,
+              }}
             />
-          </section>
-          <section className="sidebar-section outline-section">
-            <h2 className="sidebar-title">符号</h2>
-            <SymbolOutline
-              symbols={fileContent.data?.symbols ?? []}
-              onSelect={selectSymbol}
-            />
-          </section>
-        </aside>
-        <main className="app-main">
-          {triggerIndex.isPending ? (
-            <div className="app-loading">
-              <Spinner />
-              <p>正在索引…</p>
-            </div>
-          ) : !hasFiles && !isIndexed ? (
-            <EmptyState onTriggerIndex={() => triggerIndex.mutate()} />
-          ) : fileContent.isLoading ? (
-            <div className="app-loading">
-              <Spinner />
-              <p>加载文件…</p>
-            </div>
-          ) : selectedFile && fileContent.data ? (
-            <CodeView
-              ref={codeViewRef}
-              content={fileContent.data.content}
-              calls={fileContent.data.calls}
-              onSymbolClick={(line, col) =>
-                jumpFromPosition(fileContent.data.calls, line, col)
-              }
-            />
-          ) : (
-            <p className="app-placeholder">选择一个文件开始阅读</p>
-          )}
-        </main>
-        <SidePanel
-          selectedSymbol={selectedSymbol}
-          onNodeSelect={selectSymbol}
-          chat={{
-            messages: chat.messages,
-            isStreaming: chat.isStreaming,
-            error: chat.error,
-            draft: chatDraft,
-            llmConfigured: llmConfig.data?.configured ?? false,
-            configMessage: llmConfig.data?.message ?? null,
-            configLoading: llmConfig.isPending,
-            onDraftChange: handleDraftChange,
-            onSend: handleSend,
-            onRetry: handleRetry,
-            onClear: chat.clear,
-            onAbort: chat.abort,
-          }}
-        />
+          </>
+        )}
       </div>
+      {/* Stage 7a A-1：多候选跳转浮层 */}
+      <CandidatePicker
+        candidates={jumpCandidates}
+        onPick={(sym) => {
+          setJumpCandidates(null);
+          selectSymbol(sym);
+        }}
+        onClose={() => setJumpCandidates(null)}
+      />
     </div>
   );
 }

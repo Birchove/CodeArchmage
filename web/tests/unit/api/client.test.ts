@@ -74,6 +74,8 @@ describe("api/client — apiPost", () => {
       symbols_total: 10,
       calls_total: 5,
       duration_ms: 42,
+      files_updated: 3,
+      files_skipped: 0,
     };
     vi.spyOn(globalThis, "fetch").mockResolvedValue(mockResponse(200, fake));
 

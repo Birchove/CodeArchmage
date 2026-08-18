@@ -115,10 +115,29 @@ export const jumpLineField = StateField.define<DecorationSet>({
 
 const callMark = Decoration.mark({ class: "cm-call-mark" });
 
-/** 给调用点加可点击标记（hover 才显底色，避免满屏下划线）。 */
+/** 取行文本中前 byteCol 个 UTF-8 字节对应的子串（按码点累计）。 */
+export function sliceByBytes(text: string, byteCol: number): string {
+  let bytes = 0;
+  let out = "";
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) ?? 0;
+    const len = cp <= 0x7f ? 1 : cp <= 0x7ff ? 2 : cp <= 0xffff ? 3 : 4;
+    if (bytes + len > byteCol) break;
+    bytes += len;
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * 给调用点加可点击标记（hover 才显底色，避免满屏下划线）。
+ *
+ * A-3：调用列先做字节列→码元列校正（中文注释/字符串行必须，否则标记错位）。
+ * sliceByBytes(行文本, 字节列) 的码元长度即校正后的码元列。
+ */
 export function buildCallMarks(
   docLines: number,
-  lineLength: (line: number) => { from: number; to: number },
+  lineLength: (line: number) => { from: number; to: number; text: string },
   calls: CallOut[],
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
@@ -126,7 +145,8 @@ export function buildCallMarks(
   for (const call of sorted) {
     if (call.line < 1 || call.line > docLines) continue;
     const line = lineLength(call.line);
-    const from = line.from + Math.max(0, call.col);
+    const from =
+      line.from + sliceByBytes(line.text, Math.max(0, call.col)).length;
     const to = Math.min(line.to, from + call.callee_name.length);
     if (to > from) builder.add(from, to, callMark);
   }

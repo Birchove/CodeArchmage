@@ -85,6 +85,51 @@ describe("App — 已索引 + 选文件 + 大纲", () => {
   });
 });
 
+describe("App — 阅读模式导读入口（Stage 7b）", () => {
+  it("打开的文件有导读 → 显示「查看导读」，点击切到导读模式", async () => {
+    server.use(
+      http.get("*/api/guides", () =>
+        HttpResponse.json({
+          scope: "file",
+          path: "main.py",
+          content_md: "文件导读。",
+          blocks: [{ type: "text", text: "文件导读。" }],
+          stale: false,
+          model: "m1",
+        }),
+      ),
+      http.get("*/api/guides/tree", () =>
+        HttpResponse.json({
+          project: { scope: "project", path: "", status: "none" },
+          modules: [],
+          files: [{ scope: "file", path: "main.py", status: "cached" }],
+        }),
+      ),
+      http.post("*/api/guides/generate", () =>
+        HttpResponse.json({ detail: "x" }),
+      ),
+    );
+
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("main.py")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("main.py"));
+    await waitFor(() =>
+      expect(document.querySelector(".cm-content")).not.toBeNull(),
+    );
+
+    // 有导读 → 入口按钮出现
+    const btn = await screen.findByRole("button", { name: /查看导读/ });
+    fireEvent.click(btn);
+
+    // 切到导读模式 → 导读目录可见
+    await waitFor(() =>
+      expect(screen.getByText("导读目录")).toBeInTheDocument(),
+    );
+  });
+});
+
 describe("App — 索引触发", () => {
   it("点索引按钮 → POST /api/index → 成功后刷新", async () => {
     const indexCalls: string[] = [];
@@ -96,6 +141,8 @@ describe("App — 索引触发", () => {
           symbols_total: 5,
           calls_total: 3,
           duration_ms: 10,
+          files_updated: 2,
+          files_skipped: 0,
         });
       }),
     );

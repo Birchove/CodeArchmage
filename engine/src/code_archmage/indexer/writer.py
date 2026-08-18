@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,6 +21,19 @@ from code_archmage.parser.parser import parse
 
 # 目录索引时跳过的目录名
 _SKIP_DIRS = frozenset({"__pycache__", ".venv", "venv", ".git", "node_modules"})
+
+
+@dataclass(frozen=True)
+class IndexStats:
+    """一次目录索引的计数统计（Stage 7a A-5）。
+
+    Attributes:
+        files_indexed: 本次重新解析写入的文件数（新文件 + hash 变化）
+        files_skipped: hash 未变跳过的文件数
+    """
+
+    files_indexed: int
+    files_skipped: int
 
 
 def _normalize_path(file_path: str | Path, repo_root: str | Path) -> str:
@@ -171,7 +185,7 @@ def index_file(
 def index_directory(
     conn: sqlite3.Connection,
     repo_root: str | Path,
-) -> None:
+) -> IndexStats:
     """索引整个目录（增量索引 + 先删后写 + 孤儿清理）。
 
     流程：
@@ -184,10 +198,16 @@ def index_directory(
     Args:
         conn: 数据库连接
         repo_root: 仓库根目录
+
+    Returns:
+        IndexStats（本次重新索引 / 跳过的文件数）
     """
     root = Path(repo_root)
     disk_files = _iter_python_files(root)
     disk_rel_paths: set[str] = set()
+
+    indexed = 0
+    skipped = 0
 
     for py_file in disk_files:
         rel_path = _normalize_path(py_file, root)
@@ -197,11 +217,13 @@ def index_directory(
         # 增量检查：hash 相同则跳过
         existing = conn.execute("SELECT hash FROM files WHERE path = ?", (rel_path,)).fetchone()
         if existing and existing[0] == file_hash:
+            skipped += 1
             continue
 
         # hash 变化或新文件 → 解析并索引（index_file 内部先删后写）
         result = parse(py_file)
         index_file(conn, root, result)
+        indexed += 1
 
     # 孤儿清理：DB 中有但磁盘上已删除的文件
     db_files = conn.execute("SELECT path FROM files").fetchall()
@@ -214,3 +236,5 @@ def index_directory(
             except Exception:
                 conn.execute("ROLLBACK")
                 raise
+
+    return IndexStats(files_indexed=indexed, files_skipped=skipped)

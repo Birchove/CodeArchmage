@@ -9,20 +9,36 @@
 
 import type { CallOut } from "@/api/types";
 
+/** 点击位置与调用点列的基础容差（A-3）。 */
+const TOLERANCE_BASE = 2;
+
 /**
- * 在调用点列表中查找匹配行+列的调用。
+ * 在调用点列表中查找与点击位置匹配的调用（Stage 7a A-3 列容差匹配）。
  *
- * 已知限制（B-6）：parser 的 col 是 tree-sitter 字节偏移，
- * 前端 CodeView 给的是 JS UTF-16 code-unit 偏移。
- * 含非 ASCII 的行（中文注释）两者不等，点击可能匹配不到。
- * 阶段 5 修：字节偏移转码点偏移，或前端做 ±N 列容差匹配。
+ * 背景（B-6 修复）：parser 的 col 是 tree-sitter UTF-8 字节偏移，
+ * 前端 CodeView 给的是 JS UTF-16 code-unit 偏移。含非 ASCII 的行
+ * （中文注释/字符串很常见）两者不等，精确匹配会漏。
+ *
+ * 规则：同一行内，取满足 |点击列 - 调用列| ≤ 名字长度 + 基础容差
+ * 的最近调用点；都不满足 → null。名字越长容差越大（覆盖
+ * 长名字内部的点击），短名字不误伤相邻调用。
  */
 export function findCallAt(
   calls: CallOut[],
   line: number,
   col: number,
 ): CallOut | null {
-  return calls.find((c) => c.line === line && c.col === col) ?? null;
+  let best: CallOut | null = null;
+  let bestDist = Infinity;
+  for (const c of calls) {
+    if (c.line !== line) continue;
+    const dist = Math.abs(col - c.col);
+    if (dist <= c.callee_name.length + TOLERANCE_BASE && dist < bestDist) {
+      best = c;
+      bestDist = dist;
+    }
+  }
+  return best;
 }
 
 export type JumpAction =

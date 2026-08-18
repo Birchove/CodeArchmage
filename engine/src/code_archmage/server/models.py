@@ -69,12 +69,18 @@ class FileTreeOut(BaseModel):
 
 
 class IndexResultOut(BaseModel):
-    """索引触发结果。"""
+    """索引触发结果。
+
+    Stage 7a A-5：files_updated / files_skipped 让前端展示增量统计
+    （"更新 X / 跳过 Y"），避免用户误以为每次都全量重建。
+    """
 
     files_total: int
     symbols_total: int
     calls_total: int
     duration_ms: int
+    files_updated: int
+    files_skipped: int
 
 
 class IndexStatusOut(BaseModel):
@@ -131,3 +137,53 @@ class SummaryRequest(BaseModel):
     """摘要生成请求。"""
 
     symbol_id: int
+
+
+# ---------------------------------------------------------------------------
+# Stage 7b：导读（Guides）相关模型
+# ---------------------------------------------------------------------------
+
+
+class GuideEntryOut(BaseModel):
+    """导读目录中的一个条目及其状态。"""
+
+    scope: str  # "project" | "module" | "file"
+    path: str  # 项目导读为 ""
+    status: str  # "none" | "cached" | "stale"
+
+
+class GuideTreeOut(BaseModel):
+    """导读目录（确定性：来自索引，不花 token）。"""
+
+    project: GuideEntryOut
+    modules: list[GuideEntryOut]
+    files: list[GuideEntryOut]
+
+
+class GuideBlockOut(BaseModel):
+    """导读块。type=text 时用 text；type=code 时用 file_path/start_line/end_line。"""
+
+    type: str  # "text" | "code"
+    text: str | None = None
+    file_path: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    note: str | None = None
+
+
+class GuideOut(BaseModel):
+    """一篇导读（解析为块后的形态 + stale 标记）。"""
+
+    scope: str
+    path: str
+    content_md: str
+    blocks: list[GuideBlockOut]
+    stale: bool
+    model: str
+
+
+class GuideGenerateRequest(BaseModel):
+    """导读生成请求。"""
+
+    scope: str  # "project" | "module" | "file"
+    path: str  # 项目导读为 ""

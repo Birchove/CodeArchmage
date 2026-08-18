@@ -66,5 +66,14 @@ export function defaultHandlers() {
         calls: [],
       }),
     ),
+    // Stage 7b：导读默认 handler（未生成 → 404；目录为空）
+    http.get("*/api/guides", () => new HttpResponse(null, { status: 404 })),
+    http.get("*/api/guides/tree", () =>
+      HttpResponse.json({
+        project: { scope: "project", path: "", status: "none" },
+        modules: [],
+        files: [],
+      }),
+    ),
   ];
 }

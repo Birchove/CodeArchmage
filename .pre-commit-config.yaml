@@ -20,6 +20,19 @@ repos:
     hooks:
       - id: gitleaks                   # 扫描代码里的 API key / token
 
+  # === 零依赖密钥模式扫描（gitleaks 需要 Go 二进制，此钩子保底）===
+  # Stage 7a A-4：dev_workflow.md 5.2 承诺的 sk-/token 模式检查落地。
+  # .env 本身被 gitignore；这里防的是把 key 粘进代码/文档/测试后误提交。
+  # 只匹配 sk- + 纯字母数字体（OpenAI/DeepSeek 等真实格式）；
+  # 带连字符的占位符（sk-your-api-key-here）和测试夹具不会误报。
+  - repo: local
+    hooks:
+      - id: secret-pattern-scan
+        name: 密钥模式扫描（sk- 前缀 API key）
+        entry: >-
+          bash -c 'if grep -RInE "sk-[A-Za-z0-9]{16,}" "$@"; then echo "检测到疑似 API key（sk- 前缀），提交已阻止"; exit 1; fi' --
+        language: system
+
   # === Python：ruff（lint + format，与 CI 对齐，不带 --fix）===
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.7.4

@@ -84,6 +84,19 @@ CREATE TABLE IF NOT EXISTS summaries (
 )
 """
 
+# Stage 7b：导读缓存（项目/模块/文件三级，按 scope+path 唯一）
+_TABLE_GUIDES = """\
+CREATE TABLE IF NOT EXISTS guides (
+    scope        TEXT NOT NULL,
+    path         TEXT NOT NULL,
+    content_md   TEXT NOT NULL,
+    model        TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    input_hash   TEXT NOT NULL,
+    PRIMARY KEY (scope, path)
+)
+"""
+
 # ============================================================
 # DDL：索引
 # ============================================================
@@ -146,6 +159,7 @@ _ALL_DDL: list[str] = [
     _TABLE_CALLS,
     _TABLE_IMPORTS,
     _TABLE_SUMMARIES,
+    _TABLE_GUIDES,
     # FTS 虚拟表（依赖 symbols）
     _TABLE_FTS,
     # FTS 触发器（依赖 symbols + symbols_fts）
@@ -157,7 +171,8 @@ _ALL_DDL: list[str] = [
 ]
 
 # 当前 Schema 版本（未来迁移依据）
-SCHEMA_VERSION = "1"
+# 2：Stage 7b 新增 guides 表
+SCHEMA_VERSION = "2"
 
 
 def init_db(
@@ -185,9 +200,9 @@ def init_db(
     # 执行所有 DDL
     conn.executescript(";".join(_ALL_DDL))
 
-    # 写入 schema 版本（幂等）
+    # 写入 schema 版本（Stage 7b：v1→v2 升级覆盖旧版本值）
     conn.execute(
-        "INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', ?)",
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
         (SCHEMA_VERSION,),
     )
     conn.commit()

@@ -12,9 +12,9 @@ describe("lib/jump — findCallAt", () => {
     expect(findCallAt(calls, 5, 4)?.callee_name).toBe("foo");
   });
 
-  it("行匹配但列不匹配 → null", () => {
+  it("行匹配但列远超容差 → null", () => {
     const calls = [call({ line: 5, col: 4 })];
-    expect(findCallAt(calls, 5, 0)).toBeNull();
+    expect(findCallAt(calls, 5, 40)).toBeNull();
   });
 
   it("无匹配 → null", () => {
@@ -27,6 +27,43 @@ describe("lib/jump — findCallAt", () => {
       call({ callee_name: "b", line: 2, col: 0 }),
     ];
     expect(findCallAt(calls, 2, 0)?.callee_name).toBe("b");
+  });
+
+  // Stage 7a A-3：列容差匹配（UTF-8 字节列 vs UTF-16 列偏移修复）
+  it("点击列略小于调用列（中文在前）→ 命中最近的调用点", () => {
+    // "# 中文 foo()"：parser 存 UTF-8 字节列，CodeMirror 给 UTF-16 列，
+    // 点击位置比记录列小（每个中文字符差 2 列）
+    const calls = [call({ callee_name: "foo", line: 5, col: 8 })];
+    expect(findCallAt(calls, 5, 6)?.callee_name).toBe("foo");
+  });
+
+  it("点击列略大于调用列 → 命中（覆盖反向偏移）", () => {
+    const calls = [call({ callee_name: "foo", line: 5, col: 4 })];
+    expect(findCallAt(calls, 5, 6)?.callee_name).toBe("foo");
+  });
+
+  it("点击列距调用点太远 → null（不误伤相邻调用）", () => {
+    const calls = [call({ callee_name: "foo", line: 5, col: 20 })];
+    expect(findCallAt(calls, 5, 0)).toBeNull();
+  });
+
+  it("同一行两个调用点 → 命中列最近的那个", () => {
+    const calls = [
+      call({ callee_name: "f", line: 5, col: 0 }),
+      call({ callee_name: "g", line: 5, col: 6 }),
+    ];
+    expect(findCallAt(calls, 5, 5)?.callee_name).toBe("g");
+    expect(findCallAt(calls, 5, 1)?.callee_name).toBe("f");
+  });
+
+  it("容差随调用名长度伸缩：长名字允许更大偏移", () => {
+    // 名字 10 字符 + 容差 → 偏移 11 仍命中；短名字同样偏移则不命中
+    const calls = [
+      call({ callee_name: "very_long_fn", line: 1, col: 20 }),
+      call({ callee_name: "ab", line: 2, col: 20 }),
+    ];
+    expect(findCallAt(calls, 1, 9)?.callee_name).toBe("very_long_fn");
+    expect(findCallAt(calls, 2, 9)).toBeNull();
   });
 });
 

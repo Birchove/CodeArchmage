@@ -5,13 +5,16 @@
  * - jump-by-id（已解析）→ 精确跳
  * - jump-by-name（未解析）→ 名称匹配降级
  * - O-1：404 → 失效 fileContent 缓存
+ *
+ * Stage 7a A-1：多候选不再静默失败——通过 onCandidates 回调交给
+ * 上层弹候选浮层（CandidatePicker），由用户点选跳转目标。
  */
 
 import { useQueryClient } from "@tanstack/react-query";
 import { getSymbolById, getSymbolsByName } from "@/api/endpoints";
 import { ApiError } from "@/api/client";
 import { findCallAt, decideJump } from "@/lib/jump";
-import type { CallOut } from "@/api/types";
+import type { CallOut, SymbolOut } from "@/api/types";
 
 export interface JumpCallbacks {
   /** 打开目标文件并准备滚动到指定行。 */
@@ -20,9 +23,15 @@ export interface JumpCallbacks {
   onSameFileScroll: (line: number) => void;
 }
 
+export interface JumpOptions {
+  /** 多候选时的回调（弹浮层）；未提供则保持静默不跳转（A-1）。 */
+  onCandidates?: (candidates: SymbolOut[]) => void;
+}
+
 export function useJumpToDefinition(
   currentFile: string | null,
   callbacks: JumpCallbacks,
+  options: JumpOptions = {},
 ): {
   jumpFromCall: (call: CallOut) => Promise<void>;
   jumpFromPosition: (calls: CallOut[], line: number, col: number) => void;
@@ -42,7 +51,6 @@ export function useJumpToDefinition(
         }
       } catch (e: unknown) {
         // O-1：404 → 失效缓存（符号 id 跨索引不稳定）
-        // 失效 fileContent + symbol 两个 key；重试 + toast 留阶段 5
         if (e instanceof ApiError && e.status === 404) {
           void queryClient.invalidateQueries({ queryKey: ["fileContent"] });
           void queryClient.invalidateQueries({ queryKey: ["symbol"] });
@@ -57,8 +65,11 @@ export function useJumpToDefinition(
         } else {
           callbacks.onSameFileScroll(sym.line);
         }
+      } else if (candidates.length > 1) {
+        // A-1：多候选交给上层弹浮层，用户点选后走 selectSymbol
+        options.onCandidates?.(candidates);
       }
-      // 多候选 → 留阶段 5 调用图细化
+      // 0 候选：无定义可跳，保持静默（调用点可能是外部库/属性调用）
     }
   }
 
