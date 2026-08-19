@@ -124,4 +124,26 @@ describe("parseSSEStream", () => {
     }
     expect(results).toHaveLength(0);
   });
+
+  it("signal abort cancels a hanging stream (Stage 8 中止)", async () => {
+    const ac = new AbortController();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const chunk = `data: ${JSON.stringify({ delta: "x" })}\n\n`;
+        controller.enqueue(new TextEncoder().encode(chunk));
+        // 不 close：模拟仍在生成
+      },
+    });
+
+    const got: string[] = [];
+    const done = (async () => {
+      for await (const chunk of parseSSEStream(new Response(stream), ac.signal)) {
+        if (chunk.delta) got.push(chunk.delta);
+        ac.abort();
+      }
+    })();
+
+    await done;
+    expect(got).toEqual(["x"]);
+  });
 });

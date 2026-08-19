@@ -60,6 +60,8 @@ function AppInner(): JSX.Element {
   const [scrollTick, setScrollTick] = useState(0);
   // 「查看导读」进入导读模式时的聚焦文件
   const [guideFocus, setGuideFocus] = useState<string | null>(null);
+  // Stage 8：「生成并查看导读」的一次性自动生成信号
+  const [guideAutoGen, setGuideAutoGen] = useState(false);
 
   const health = useHealth();
   const indexStatus = useIndexStatus();
@@ -143,9 +145,26 @@ function AppInner(): JSX.Element {
     { onCandidates: (cands) => setJumpCandidates(cands) },
   );
 
+  // Stage 8：阅读模式导读入口（查看导读 / 生成并查看导读）统一走这里
+  const openGuideForFile = useCallback(
+    (filePath: string, autoGenerate: boolean) => {
+      setGuideFocus(filePath);
+      setGuideAutoGen(autoGenerate);
+      setMode("guide");
+    },
+    [],
+  );
+
+  // Stage 7b/8：模式切换；离开导读模式时作废一次性自动生成信号
+  const handleModeChange = useCallback((m: AppMode) => {
+    setMode(m);
+    if (m === "read") setGuideAutoGen(false);
+  }, []);
+
   // Stage 7b：导读代码块点击 → 跳回阅读模式并定位
   const handleJumpToSource = useCallback((filePath: string, line: number) => {
     setMode("read");
+    setGuideAutoGen(false);
     setSelectedFile(filePath);
     pendingScrollRef.current = line;
     setScrollTick((t) => t + 1);
@@ -190,7 +209,7 @@ function AppInner(): JSX.Element {
         isSearchEnabled={isIndexed}
         onSearchSelect={handleSearchSelect}
         mode={mode}
-        onModeChange={setMode}
+        onModeChange={handleModeChange}
       />
       <div
         className={mode === "guide" ? "app-body app-body-guide" : "app-body"}
@@ -202,6 +221,7 @@ function AppInner(): JSX.Element {
             initialSelection={
               guideFocus ? { scope: "file", path: guideFocus } : undefined
             }
+            autoGenerate={guideAutoGen}
           />
         ) : (
           <>
@@ -246,19 +266,28 @@ function AppInner(): JSX.Element {
               ) : (
                 <p className="app-placeholder">选择一个文件开始阅读</p>
               )}
-              {/* Stage 7b：当前文件已有导读 → 一键进入该文件的导读 */}
-              {mode === "read" && selectedFile && fileGuide.guide && (
-                <button
-                  type="button"
-                  className="read-guide-entry"
-                  onClick={() => {
-                    setGuideFocus(selectedFile);
-                    setMode("guide");
-                  }}
-                >
-                  📖 查看导读
-                </button>
-              )}
+              {/* Stage 8：打开的文件都有导读入口——
+                  已有新鲜导读 → 查看导读；无导读 / 已过期 → 生成并查看导读 */}
+              {mode === "read" &&
+                selectedFile &&
+                !fileGuide.isLoading &&
+                (fileGuide.guide && !fileGuide.guide.stale ? (
+                  <button
+                    type="button"
+                    className="read-guide-entry"
+                    onClick={() => openGuideForFile(selectedFile, false)}
+                  >
+                    📖 查看导读
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="read-guide-entry"
+                    onClick={() => openGuideForFile(selectedFile, true)}
+                  >
+                    ✨ 生成并查看导读
+                  </button>
+                ))}
             </main>
             <SidePanel
               selectedSymbol={selectedSymbol}

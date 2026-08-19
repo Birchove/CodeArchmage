@@ -1,10 +1,11 @@
 /**
- * tests/unit/hooks/useGuide.test.ts – Stage 7b：导读数据 hooks。
+ * tests/unit/hooks/useGuide.test.ts – Stage 7b：导读数据 hooks；
+ * Stage 8：useAutoGenerate（生成并查看，防无限循环）。
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createQueryClientWrapper } from "@/test/test-utils";
-import { useGuide, useGuideTree } from "@/hooks/useGuide";
+import { useAutoGenerate, useGuide, useGuideTree } from "@/hooks/useGuide";
 import type { GuideOut, GuideTreeOut } from "@/api/types";
 
 vi.mock("@/api/endpoints", () => ({
@@ -106,5 +107,125 @@ describe("useGuide", () => {
     });
 
     await waitFor(() => expect(result.current.generateError).toBe("LLM 挂了"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 8：useAutoGenerate（「生成并查看导读」一次性自动触发）
+// ---------------------------------------------------------------------------
+
+const STALE: GuideOut = { ...CACHED, stale: true };
+
+describe("useAutoGenerate（Stage 8）", () => {
+  it("enabled + 无导读 → 触发一次 generate，guide 更新后不再触发（防循环）", () => {
+    const generate = vi.fn();
+    const onStart = vi.fn();
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: true,
+          isLoading: false,
+          guide: null,
+          generate,
+          onStart,
+        },
+      },
+    );
+
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(onStart).toHaveBeenCalledTimes(1);
+
+    // 生成完成 → 缓存失效重取 → guide 变化，effect 重跑但不再触发
+    rerender({ enabled: true, isLoading: false, guide: CACHED, generate, onStart });
+    expect(generate).toHaveBeenCalledTimes(1);
+    rerender({ enabled: true, isLoading: false, guide: CACHED, generate, onStart });
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("enabled + stale 导读 → 触发生成", () => {
+    const generate = vi.fn();
+    renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: true,
+          isLoading: false,
+          guide: STALE,
+          generate,
+        },
+      },
+    );
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("enabled + 新鲜缓存 → 不触发", () => {
+    const generate = vi.fn();
+    renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: true,
+          isLoading: false,
+          guide: CACHED,
+          generate,
+        },
+      },
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("缓存查询加载中 → 等加载完再决策", () => {
+    const generate = vi.fn();
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: true,
+          isLoading: true,
+          guide: null,
+          generate,
+        },
+      },
+    );
+    expect(generate).not.toHaveBeenCalled();
+
+    rerender({ enabled: true, isLoading: false, guide: null, generate });
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("enabled=false → 不触发", () => {
+    const generate = vi.fn();
+    renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: false,
+          isLoading: false,
+          guide: null,
+          generate,
+        },
+      },
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("生成失败后不自动重试（只触发一次）", () => {
+    const generate = vi.fn();
+    const { rerender } = renderHook(
+      (props: Parameters<typeof useAutoGenerate>[0]) => useAutoGenerate(props),
+      {
+        initialProps: {
+          enabled: true,
+          isLoading: false,
+          guide: null,
+          generate,
+        },
+      },
+    );
+    expect(generate).toHaveBeenCalledTimes(1);
+    // 失败后状态刷新（guide 仍为 null）→ 不得再次触发
+    rerender({ enabled: true, isLoading: false, guide: null, generate });
+    expect(generate).toHaveBeenCalledTimes(1);
   });
 });

@@ -56,8 +56,8 @@
 - 前端：228 单测通过（+28）；tsc 0 错误
 - E2E：11/11 通过（含 2 条新增导读用例）
 
-## 遗留（Stage 8 候选）
+## 遗留（已交 Stage 8 / 9）
 
-- 「查看导读」入口依赖文件级导读已生成；未生成文件的入口后续可改为「生成并查看」
-- 折叠阅读（PRD 4.3）由文件导读承担折叠职能，CodeMirror 原生折叠待验证后重估
-- 全量一键生成、打包发布（PyInstaller/Tauri）、TS 语言插件层
+Stage 8（`stage8_reading_loop.md`）已做：「生成并查看导读」、全库串行生成、README。
+
+仍留给 Stage 9：CLI `--open`、打包（PyInstaller/Tauri）、TS 语言插件、CodeMirror 原生折叠。

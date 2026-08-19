@@ -112,7 +112,7 @@ export function useChat(symbolId: number | null): UseChatReturn {
           if (!resp.ok) {
             throw new Error(`HTTP ${resp.status}`);
           }
-          for await (const chunk of parseSSEStream(resp)) {
+          for await (const chunk of parseSSEStream(resp, controller.signal)) {
             if (controller.signal.aborted) break;
             resetIdleTimer();
             if (chunk.error) {

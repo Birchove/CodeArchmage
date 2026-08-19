@@ -1193,6 +1193,43 @@ body {
   font-size: 13px;
 }
 
+/* === Stage 8：批量生成导读 === */
+.guide-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.guide-batch-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.guide-batch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guide-batch-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
 /* === 阅读/导读模式切换（Stage 7b）=== */
 .mode-switch {
   display: inline-flex;

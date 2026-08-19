@@ -16,21 +16,36 @@ export interface SSEDelta {
 
 /**
  * 将 fetch Response 解析为异步迭代器，yield SSEDelta。
- * 在收到 [DONE] 或流关闭时终止。
+ * 在收到 [DONE]、流关闭、或 signal 中止时终止。
+ *
+ * 传入 AbortSignal：中止时 cancel reader，避免卡在挂起的 read()
+ * （仅靠 fetch abort 在已拿到 Response body 后不一定能解开循环）。
  */
 export async function* parseSSEStream(
   response: Response,
+  signal?: AbortSignal,
 ): AsyncGenerator<SSEDelta> {
-  if (!response.body) return;
+  if (!response.body || signal?.aborted) return;
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  const onAbort = (): void => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    while (!signal?.aborted) {
+      let done: boolean;
+      let value: Uint8Array | undefined;
+      try {
+        ({ done, value } = await reader.read());
+      } catch {
+        // cancel() / fetch abort 会让挂起的 read() reject
+        break;
+      }
+      if (done || value === undefined) break;
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
@@ -44,12 +59,17 @@ export async function* parseSSEStream(
       }
     }
     // 处理 buffer 剩余（流已关闭）
-    if (buffer.trim()) {
+    if (buffer.trim() && !signal?.aborted) {
       const result = parseSSELine(buffer.trim());
       if (result !== null && result !== undefined) yield result;
     }
   } finally {
-    reader.releaseLock();
+    signal?.removeEventListener("abort", onAbort);
+    try {
+      reader.releaseLock();
+    } catch {
+      // cancel() 已释放锁
+    }
   }
 }
 

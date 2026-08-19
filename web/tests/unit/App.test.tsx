@@ -130,6 +130,83 @@ describe("App — 阅读模式导读入口（Stage 7b）", () => {
   });
 });
 
+describe("App — 阅读模式导读入口（Stage 8：任何打开的文件都有入口）", () => {
+  it("无导读 → 显示「生成并查看导读」，点击切导读模式并自动生成一次", async () => {
+    const generateCalls: string[] = [];
+    server.use(
+      http.get("*/api/guides/tree", () =>
+        HttpResponse.json({
+          project: { scope: "project", path: "", status: "none" },
+          modules: [],
+          files: [{ scope: "file", path: "main.py", status: "none" }],
+        }),
+      ),
+      http.post("*/api/guides/generate", async ({ request }) => {
+        const body = (await request.json()) as { scope: string; path: string };
+        generateCalls.push(`${body.scope}:${body.path}`);
+        const sse = `data: ${JSON.stringify({ content: "生成完成" })}\n\ndata: [DONE]\n\n`;
+        return new HttpResponse(sse, {
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("main.py")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("main.py"));
+    await waitFor(() =>
+      expect(document.querySelector(".cm-content")).not.toBeNull(),
+    );
+
+    // 无导读（默认 handlers 返回 404）→ 入口为「生成并查看导读」
+    const btn = await screen.findByRole("button", {
+      name: /生成并查看导读/,
+    });
+    fireEvent.click(btn);
+
+    // 切到导读模式，聚焦该文件并自动触发生成（仅一次）
+    await waitFor(() =>
+      expect(screen.getByText("导读目录")).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(generateCalls).toEqual(["file:main.py"]));
+  });
+
+  it("导读已 stale → 入口为「生成并查看导读」（而非查看导读）", async () => {
+    server.use(
+      http.get("*/api/guides", () =>
+        HttpResponse.json({
+          scope: "file",
+          path: "main.py",
+          content_md: "旧导读。",
+          blocks: [{ type: "text", text: "旧导读。" }],
+          stale: true,
+          model: "m1",
+        }),
+      ),
+    );
+
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("main.py")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByText("main.py"));
+    await waitFor(() =>
+      expect(document.querySelector(".cm-content")).not.toBeNull(),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /生成并查看导读/ }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("button", { name: /^📖 查看导读$/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("App — 索引触发", () => {
   it("点索引按钮 → POST /api/index → 成功后刷新", async () => {
     const indexCalls: string[] = [];

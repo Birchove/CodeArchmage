@@ -1,5 +1,6 @@
 /**
- * tests/unit/components/GuidePage.test.tsx – Stage 7b：导读整页视图。
+ * tests/unit/components/GuidePage.test.tsx – Stage 7b：导读整页视图；
+ * Stage 8：批量生成（进度/跳过 cached/禁用态）+ 自动生成一次性触发。
  *
  * 组件级：用 MSW mock 导读 API；生成流式逻辑已在 useGuide 单测覆盖。
  */
@@ -17,7 +18,12 @@ import { setupServer } from "msw/node";
 import { http, HttpResponse } from "msw";
 import { renderWithQueryClient } from "@/test/test-utils";
 import { GuidePage } from "@/components/GuidePage";
-import type { FileContentOut, GuideOut, GuideTreeOut } from "@/api/types";
+import type {
+  FileContentOut,
+  GuideOut,
+  GuideTreeOut,
+  LLMConfigOut,
+} from "@/api/types";
 
 const TREE: GuideTreeOut = {
   project: { scope: "project", path: "", status: "cached" },
@@ -57,6 +63,16 @@ const PROJECT_GUIDE: GuideOut = {
 function handlers() {
   return [
     http.get("*/api/guides/tree", () => HttpResponse.json(TREE)),
+    http.get("*/api/llm/config", () =>
+      HttpResponse.json<LLMConfigOut>({
+        configured: true,
+        status: "ok",
+        message: "LLM 已配置（模型：test）",
+        model: "test",
+        env_path: null,
+        missing_fields: [],
+      }),
+    ),
     http.get("*/api/guides", ({ request }) => {
       const url = new URL(request.url);
       const scope = url.searchParams.get("scope");
@@ -78,22 +94,37 @@ function handlers() {
         calls: [],
       }),
     ),
-    http.post("*/api/guides/generate", () =>
-      HttpResponse.json({ detail: "not-used-in-unit-tests" }),
-    ),
+    http.post("*/api/guides/generate", async ({ request }) => {
+      const body = (await request.json()) as { scope: string; path: string };
+      generateCalls.push(`${body.scope}:${body.path}`);
+      // 真实后端格式：SSE content 字段
+      const sse = `data: ${JSON.stringify({ content: "生成完成" })}\n\ndata: [DONE]\n\n`;
+      return new HttpResponse(sse, {
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }),
   ];
 }
+
+/** 记录批量/自动生成实际发出的生成请求（scope:path）。 */
+const generateCalls: string[] = [];
 
 const server = setupServer(...handlers());
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 beforeEach(() => {
+  generateCalls.length = 0;
   server.resetHandlers();
   server.use(...handlers());
 });
 
-function renderPage(onJumpToSource = vi.fn()) {
-  return renderWithQueryClient(<GuidePage onJumpToSource={onJumpToSource} />);
+function renderPage(
+  onJumpToSource = vi.fn(),
+  props: { autoGenerate?: boolean; initialSelection?: { scope: "project" | "module" | "file"; path: string } } = {},
+) {
+  return renderWithQueryClient(
+    <GuidePage onJumpToSource={onJumpToSource} {...props} />,
+  );
 }
 
 describe("GuidePage — 目录渲染", () => {
@@ -154,5 +185,148 @@ describe("GuidePage — 正文渲染", () => {
         screen.getByRole("button", { name: /生成导读/ }),
       ).toBeInTheDocument(),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 8：批量生成
+// ---------------------------------------------------------------------------
+
+const ALL_CACHED_TREE: GuideTreeOut = {
+  project: { scope: "project", path: "", status: "cached" },
+  modules: [{ scope: "module", path: "pkg", status: "cached" }],
+  files: [{ scope: "file", path: "main.py", status: "cached" }],
+};
+
+/** 挂起的 SSE 流（发一块后不关闭，模拟长生成；用于进度/中止断言）。 */
+function hangingSseResponse(): HttpResponse {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(
+        new TextEncoder().encode(`data: {"content":"x"}\n\n`),
+      );
+      // 不 close：模拟仍在生成
+    },
+  });
+  return new HttpResponse(stream, {
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+describe("GuidePage — 批量生成（Stage 8）", () => {
+  it("跳过 cached：只生成 none 与 stale，按 模块→文件 顺序", async () => {
+    renderPage();
+
+    const btn = await screen.findByRole("button", { name: /生成本库导读/ });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+
+    // project(cached) 与 main.py(cached) 跳过；pkg(none) 与 other.py(stale) 生成
+    await waitFor(() =>
+      expect(generateCalls).toEqual(["module:pkg", "file:other.py"]),
+    );
+    // 跑完后回到按钮态
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /生成本库导读/ }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it("生成中显示进度（N/M + 当前目标）并可中止", async () => {
+    // 第一个请求挂起 → 批量停留在运行态
+    server.use(
+      http.post("*/api/guides/generate", async ({ request }) => {
+        const body = (await request.json()) as { scope: string; path: string };
+        generateCalls.push(`${body.scope}:${body.path}`);
+        return hangingSseResponse();
+      }),
+    );
+
+    renderPage();
+    const btn = await screen.findByRole("button", { name: /生成本库导读/ });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+
+    // 进度：0/2 · pkg（第一个目标挂起中）
+    await waitFor(() => {
+      const progress = document.querySelector(".guide-batch-progress");
+      expect(progress?.textContent).toContain("正在生成 0/2");
+      expect(progress?.textContent).toContain("pkg");
+    });
+
+    // 中止 → 回到按钮态，且第二个目标未发起
+    fireEvent.click(screen.getByRole("button", { name: "中止" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /生成本库导读/ }),
+      ).toBeInTheDocument(),
+    );
+    expect(generateCalls).toEqual(["module:pkg"]);
+  });
+
+  it("LLM 未配置 → 按钮禁用并提示原因", async () => {
+    server.use(
+      http.get("*/api/llm/config", () =>
+        HttpResponse.json<LLMConfigOut>({
+          configured: false,
+          status: "not_found",
+          message: "未找到 .env 文件",
+          env_path: null,
+          missing_fields: [],
+        }),
+      ),
+    );
+
+    renderPage();
+    const btn = await screen.findByRole("button", { name: /生成本库导读/ });
+    await waitFor(() => expect(btn).toBeDisabled());
+    expect(btn).toHaveAttribute("title", "未找到 .env 文件");
+    expect(generateCalls).toEqual([]);
+  });
+
+  it("全部已生成 → 按钮禁用并显示「导读已全部生成」", async () => {
+    server.use(
+      http.get("*/api/guides/tree", () => HttpResponse.json(ALL_CACHED_TREE)),
+    );
+
+    renderPage();
+    const btn = await screen.findByRole("button", {
+      name: /导读已全部生成/,
+    });
+    await waitFor(() => expect(btn).toBeDisabled());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 8：自动生成（「生成并查看导读」入口）
+// ---------------------------------------------------------------------------
+
+describe("GuidePage — 自动生成（Stage 8）", () => {
+  it("autoGenerate + initialSelection → 自动触发生成一次，不循环", async () => {
+    renderPage(vi.fn(), {
+      autoGenerate: true,
+      initialSelection: { scope: "file", path: "other.py" },
+    });
+
+    // other.py 无缓存（404）→ 自动开跑一次
+    await waitFor(() => expect(generateCalls).toEqual(["file:other.py"]));
+
+    // 生成完成后缓存失效重取仍 404 → 不得二次触发（防无限循环）
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^生成导读$/ })).toBeInTheDocument(),
+    );
+    expect(generateCalls).toEqual(["file:other.py"]);
+  });
+
+  it("无 autoGenerate 信号 → 不自动生成", async () => {
+    renderPage(vi.fn(), {
+      initialSelection: { scope: "file", path: "other.py" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^生成导读$/ })).toBeInTheDocument(),
+    );
+    expect(generateCalls).toEqual([]);
   });
 });
